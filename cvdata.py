@@ -113,39 +113,39 @@ class CVData(object):
         elev = fdtype(data['elev'][0][0][0][0]) # AKA Grazing angle
         incident_angle = 90 - elev
         
-        # Find relevant azimuth indices
-        az_idx = np.logical_and(azim >= minaz, azim <= maxaz)
-        
         # If center_frequency and bandwidth defined, override frequency range
         if bandwidth is not None and center_frequency is not None:
             half = bandwidth/2.0
             minfreq = center_frequency - half
             maxfreq = center_frequency + half
         
+        # Only grab phase history over desired azimuth and frequency range 
+        az_idx = np.logical_and(azim >= minaz, azim <= maxaz)
         freq_idx = np.logical_and(freq >= minfreq, freq <= maxfreq)
-            
-        self.ph_data = cdtype(data[pol][0,0])[freq_idx][:, az_idx]
-        AntAzim = fdtype(azim[az_idx])
         
+        # Complex phase history data
+        self.cphd = cdtype(data[pol][0,0])[freq_idx][:, az_idx]
+        
+        # Grab the true collection geometries stored in the data
+        AntAzim = fdtype(azim[az_idx])
         AntElev = fdtype(data['elev'][0,0][0,0])
         AntFreq = fdtype(freq[freq_idx])
         center_freq = (AntFreq[-1] + AntFreq[0])/2.0
         minF = np.min(AntFreq)
         deltaF = AntFreq[1] - AntFreq[0] # Pulse-Bandwidth
-        [K, Np] = self.ph_data.shape 
+        [K, Np] = self.cphd.shape 
         
+        # Apply a 2-D hamming window to CPHD for side-lobe suppression
         if taper_flag:
             hamming1 = np.hamming(K)[np.newaxis].T
             hamming2 = np.hamming(Np)[np.newaxis]
             taper_window = np.matmul(hamming1, hamming2)
-            self.ph_data = self.ph_data * fdtype(taper_window)
+            self.cphd = self.cphd * fdtype(taper_window)
             del hamming1, hamming2, taper_window
         
-        # Define the spatial extent for quicker processing
-        self.x_vec = np.linspace(x0 - Wx/2, 
-                                 x0 + Wx/2, Nx, dtype=fdtype)
-        self.y_vec = np.linspace(y0 - Wy/2, 
-                                 y0 + Wy/2, Ny, dtype=fdtype)
+        # Define the spatial extent with MeshGrid for quicker processing
+        self.x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, Nx, dtype=fdtype)
+        self.y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, Ny, dtype=fdtype)
         [x_mat, y_mat] = np.meshgrid(self.x_vec, self.y_vec)
         z_mat = np.zeros(x_mat.shape, fdtype)
         
@@ -159,9 +159,9 @@ class CVData(object):
         totalAz = np.max(AntAz) - np.min(AntAz)
         
         # Determine the maximum wavelength (m)
-        # This line was provided by AFRL, but I think it is wrong.
+        # The next line was provided by AFRL, but I think it is wrong.
         # maxLambda = c / (minF[0] + (deltaF * K)) # this is minLambda
-        maxLambda = c / minF # This is what maxLambda should be
+        maxLambda = c / minF # This is what maxLambda should be I think
         
         # Determine the maximum scene size of the image (m)
         maxWr = c/(2*deltaF)  
@@ -177,11 +177,11 @@ class CVData(object):
             except RuntimeWarning:
                 dwell_angle = 0.0
 
+        # Print off some data statictics (if verbose is on)
         f1 = AntFreq[0]/1e9
         f2 = AntFreq[-1]/1e9
         az1 = np.rad2deg(AntAz[0])
         az2 = np.rad2deg(AntAz[-1])
-        # Display maximum scene size and resolution
         if verbose:
             print('        Using %s model...' % target)
             print('          Incident Angle: %1.0f deg' % incident_angle)
@@ -198,6 +198,7 @@ class CVData(object):
             print('  Cross-Range Resolution: %1.2fm'  % dx)
             print('             Dwell Angle: %1.1f degrees' % dwell_angle)
             print("")
+        
         # Calculate the range to every bin in the range profile (m)
         r_vec = np.linspace(-Nfft/2,Nfft/2-1, Nfft, dtype=fdtype)* maxWr/Nfft
         
@@ -207,11 +208,11 @@ class CVData(object):
         phCorr_exp = np.complex64(1j*4.0*np.pi*minF/c)
         self.im_final = np.zeros(x_mat.shape, cdtype);
         
-        # Multi-processing approach (not done yet)
+        # Multi-processing approach
         if n_jobs > 1:
             args = []
             for ii in range(Np):
-                args += [(self.ph_data[:,ii], Nfft, x_mat, y_mat, 
+                args += [(self.cphd[:,ii], Nfft, x_mat, y_mat, 
                          z_mat, AntElev, AntAzim[ii], phCorr_exp, 
                          min_rvec, max_rvec, r_vec)]
     
@@ -222,17 +223,18 @@ class CVData(object):
                 idx = results[ii][1]
                 self.im_final[idx] = self.im_final[idx] + results[ii][0]
         
-        # Single Processor
+        # Single Processor approach
         else:
             for ii in range(Np):
                 print('\rProcessing: %1.1f%%' % (ii/Np *100.0), end="") 
-                [img, idx] = par_helper(self.ph_data[:,ii], Nfft, x_mat, 
+                [img, idx] = par_helper(self.cphd[:,ii], Nfft, x_mat, 
                         y_mat, z_mat, AntElev, AntAzim[ii],  
                         phCorr_exp, min_rvec, max_rvec, r_vec)
                 self.im_final[idx] = self.im_final[idx] + img
             
         print("")
     
+    # Display log-scaled image
     def imshow(self):
         plt.figure(1, figsize=[10,10])
         img = np.abs(self.im_final)/np.max(np.abs(self.im_final))
@@ -248,9 +250,49 @@ class CVData(object):
         y_loc = np.linspace(0, img.shape[1], 11, dtype=np.int32)
         plt.xticks(x_loc, x_tic)
         plt.yticks(y_loc, y_tic)
-        
+    
+    # Return Complex Phase History Data
+    def getCPHD(self):
+        return self.cphd
+    
+    # Return Complex Image (built by backprojection)
+    def getComplexImage(self):
+        return self.im_final
+    
+    # Get the amplitude-only data
+    def getAmplitudeData(self):
+        return np.abs(self.im_final)
+    
+    # Get the phase-only data
+    def getPhaseData(self):
+        return np.angle(self.im_final)
+    
+    # Get the real data
+    def getRealData(self):
+        return np.real(self.im_final)
+    
+    # Get the imaginary data
+    def getImaginaryData(self):
+        return np.imag(self.im_final)
+    
+    # Get a 2-channel image with ampliture and phase
+    def getAmpPhaseChannels(self):
+        img = np.expand_dims(self.getAmplitudeData(), 2)
+        return np.append(img , self.getPhaseData()[: , :, np.newaxis], -1)
+    
+    # Get a 2-channel image with real and imaginary components
+    def getRealImagChannels(self):
+         img = np.expand_dims(self.getRealData(), 2)
+         return np.append(img , self.getImaginaryData()[: , :, np.newaxis], -1)
+
+    # Get a 4-channel image with amplitude, phase, real, and imaginary
+    # components (in-order)
+    def getAllFourChannels(self):
+        return np.append(self.getAmpPhaseChannels(), 
+                         self.getRealImagChannels(), 2)
+
 if __name__ == "__main__": 
-    data_path = 'data\Civilian Vehicles\Domes\Camry\Camry_el30.0000.mat'
+    data_path = '..\data\Civilian Vehicles\Domes\Camry\Camry_el30.0000.mat'
     target = data_path.split('\\')[-2]
         
     cvdata = CVData(data_path, target, 
@@ -264,3 +306,5 @@ if __name__ == "__main__":
                     fft_samples=512,
                     )
     cvdata.imshow()
+    cphd = cvdata.getCPHD()
+    four_channel = cvdata.getAllFourChannels()
