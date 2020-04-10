@@ -69,7 +69,6 @@ X_train = X[train_idx]
 y_train = y[train_idx]
 depression_angle_train = depression_angle[train_idx]
 
-
 # Testing data is for depression_angle=15,30, and 45
 test_idx = depression_angle !=  17
 X_test = X[test_idx]
