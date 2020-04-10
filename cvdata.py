@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-
+'''
+File: cvdata.py
+Description: Contains software to process AFRL Civilian Dome Datasets
+Author: Ronald Kemker
+'''
 from scipy.io import loadmat
 import numpy as np
 from numpy.fft import ifft, fftshift
@@ -28,9 +32,11 @@ def par_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim,
     # Update the image using linear interpolation
     return np.interp(dR[idx], r_vec, rc) * phCorr[idx], idx
 
+# Compute cos(x) when x is currently in degrees
 def cosd(X):
     return np.cos(np.deg2rad(X))
 
+# Compute sin(x) when x is currently in degrees
 def sind(X):
     return np.sin(np.deg2rad(X))
 
@@ -80,7 +86,8 @@ class CVData(object):
                  dynamic_range=70, verbose = True, n_jobs=1,
                  single_precision=True):
         
-        pol = polarization 
+        self.target = target
+        pol = polarization
         minaz = min_azimuth_angle
         maxaz = max_azimuth_angle
         minfreq = min_frequency
@@ -112,6 +119,7 @@ class CVData(object):
         freq = fdtype(data['FGHz'][0,0][:,0] * 1e9)
         elev = fdtype(data['elev'][0][0][0][0]) # AKA Grazing angle
         incident_angle = 90 - elev
+        self.elevation = elev
         
         # If center_frequency and bandwidth defined, override frequency range
         if bandwidth is not None and center_frequency is not None:
@@ -225,6 +233,7 @@ class CVData(object):
         
         # Single Processor approach
         else:
+            print("")
             for ii in range(Np):
                 print('\rProcessing: %1.1f%%' % (ii/Np *100.0), end="") 
                 [img, idx] = par_helper(self.cphd[:,ii], Nfft, x_mat, 
