@@ -110,7 +110,7 @@ class CVData(object):
         data = loadmat(data_path)['data']
         azim = fdtype(data['azim'][0][0][0])
         freq = fdtype(data['FGHz'][0,0][:,0] * 1e9)
-        elev = fdtype(data['elev'][0][0][0][0]) # AKA Incident angle
+        elev = fdtype(data['elev'][0][0][0][0]) # AKA Grazing angle
         incident_angle = 90 - elev
         
         # Find relevant azimuth indices
