@@ -184,22 +184,3 @@ class CVData(object):
     # Return Complex Phase History Data
     def getCPHD(self):
         return self.cphd
-        
-if __name__ == "__main__": 
-    from image_formation import backProjection
-    from utils import imshow
-    
-    data_path = '..\..\data\Civilian Vehicles\Domes\Camry\Camry_el30.0000.mat'
-    target = data_path.split('\\')[-2]
-        
-    cvdata = CVData(data_path, target, 
-                    min_azimuth_angle=44, 
-                    max_azimuth_angle=46, 
-                    polarization='vv',
-                    center_frequency=9.6e9, 
-                    bandwidth=300e6,
-                    taper_flag=True,
-                    )
-    
-    image = backProjection(cvdata)
-    imshow(image, cvdata.x_vec, cvdata.y_vec)
