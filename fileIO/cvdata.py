@@ -116,7 +116,7 @@ class CVData(object):
         
         # Apply a 2-D hamming window to CPHD for side-lobe suppression
         if taper_flag:
-            self.cphd = fdtype(hamming_window(self.cphd))
+            self.cphd = cdtype(hamming_window(self.cphd))
         
         # Define the spatial extent with MeshGrid for quicker processing
         self.x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, Nx, dtype=fdtype)
