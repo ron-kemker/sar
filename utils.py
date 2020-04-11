@@ -25,3 +25,13 @@ def imshow(im, x_vec, y_vec, dynamic_range=70):
     y_loc = np.linspace(0, img.shape[1], 11, dtype=np.int32)
     plt.xticks(x_loc, x_tic)
     plt.yticks(y_loc, y_tic)
+    
+def getAmplitudeOnly(img):
+    return np.abs(img)
+
+def getPhaseOnly(img):
+    return np.angle(img)
+
+def getAmplitudePhase(img):
+    amp = getAmplitudeOnly(img)[:,:,np.newaxis]
+    return np.append(amp, getPhaseOnly(img)[:,:,np.newaxis], 2)
