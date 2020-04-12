@@ -12,7 +12,7 @@ from numpy.fft import ifft, fftshift
 import numpy as np
 
 # This processes a single pulse (broken out for parallelization)
-def par_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim, 
+def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim, 
                phCorr_exp, min_rvec, max_rvec, r_vec):
                 
     # Form the range profile with zero padding added
@@ -102,7 +102,7 @@ def backProjection(sar_obj, fft_samples=512, n_jobs=1, single_precision=True):
                      min_rvec, max_rvec, r_vec)]
 
         with Pool(processes=n_jobs) as pool:
-            results = pool.starmap(par_helper, args)
+            results = pool.starmap(bp_helper, args)
                         
         for ii in range(Np):
             idx = results[ii][1]
@@ -113,29 +113,10 @@ def backProjection(sar_obj, fft_samples=512, n_jobs=1, single_precision=True):
         print("")
         for ii in range(Np):
             print('\rProcessing: %1.1f%%' % (ii/Np *100.0), end="") 
-            [img, idx] = par_helper(cphd[:,ii], Nfft, x_mat, 
+            [img, idx] = bp_helper(cphd[:,ii], Nfft, x_mat, 
                     y_mat, z_mat, el, az[ii],  
                     phCorr_exp, min_rvec, max_rvec, r_vec)
             im_final[idx] = im_final[idx] + img
         
     print("") 
-    return im_final
-
-if __name__ == "__main__": 
-    from cvdata import CVData
-    from utils import imshow
-    
-    data_path = '..\..\data\Civilian Vehicles\Domes\Camry\Camry_el30.0000.mat'
-    target = data_path.split('\\')[-2]
-        
-    cvdata = CVData(data_path, target, 
-                    min_azimuth_angle=44, 
-                    max_azimuth_angle=46, 
-                    polarization='vv',
-                    center_frequency=9.6e9, 
-                    bandwidth=300e6,
-                    taper_flag=True,
-                    )
-    
-    image = backProjection(cvdata)
-    imshow(image, cvdata.x_vec, cvdata.y_vec)
+    return im_final    
