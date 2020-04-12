@@ -7,7 +7,7 @@ Author: Ronald Kemker
 
 '''
 
-from cvdata import CVData
+from fileIO.cvdata import CVData
 from image_formation import backProjection
 from utils import imshow
 
