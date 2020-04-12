@@ -9,6 +9,7 @@ Author: Ronald Kemker
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import ttest_ind
+import time
 
 # Display log-scaled image
 def imshow(im, x_vec, y_vec, dynamic_range=70):
@@ -27,16 +28,20 @@ def imshow(im, x_vec, y_vec, dynamic_range=70):
     plt.xticks(x_loc, x_tic)
     plt.yticks(y_loc, y_tic)
     
+# Return magnitide-only image from complex-valued image
 def getAmplitudeOnly(img):
     return np.abs(img)
 
+# Return phase-only image from complex-valued image
 def getPhaseOnly(img):
     return np.angle(img)
 
+# Convert complex-valued image into two channel image (for deep learning)
 def getAmplitudePhase(img):
     amp = getAmplitudeOnly(img)[:,:,np.newaxis]
     return np.append(amp, getPhaseOnly(img)[:,:,np.newaxis], 2)
 
+# Two-side t-test for statistical significance testing
 def ttest(x1 , x2, confidence=0.99):
     
     ttest, pval = ttest_ind(x1, x2, equal_var=False)
@@ -44,3 +49,15 @@ def ttest(x1 , x2, confidence=0.99):
         return True
     else:
         return False
+
+# Timer object
+class Timer(object):
+    def __init__(self, name=None):
+        self.name = name
+    def __enter__(self):
+        self.tic = time.time() 
+    def __exit__(self, type, value, traceback):
+        if self.name:
+            print('[%s]' % self.name)
+        self.delta = time.time() - self.tic
+        print('Elapsed: %1.3f seconds' % self.delta)
