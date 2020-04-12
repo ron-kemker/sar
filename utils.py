@@ -8,6 +8,7 @@ Author: Ronald Kemker
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import ttest_ind
 
 # Display log-scaled image
 def imshow(im, x_vec, y_vec, dynamic_range=70):
@@ -35,3 +36,11 @@ def getPhaseOnly(img):
 def getAmplitudePhase(img):
     amp = getAmplitudeOnly(img)[:,:,np.newaxis]
     return np.append(amp, getPhaseOnly(img)[:,:,np.newaxis], 2)
+
+def ttest(x1 , x2, confidence=0.99):
+    
+    ttest, pval = ttest_ind(x1, x2, equal_var=False)
+    if pval < 1-confidence:
+        return True
+    else:
+        return False
