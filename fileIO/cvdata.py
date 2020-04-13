@@ -38,12 +38,6 @@ class CVData(object):
         bandwidth: Numeric > 0.  Bandwidth to process (in Hz)
         center_freq: Numeric > 0.  Center frequency to process (in Hz)
         taper_func: func. Side-lobe reduction func from singal_processing.py
-        scene_extent_x: Numeric > 0. Scene extent x (m)
-        scene_extent_y: Numeric > 0. Scene extent y (m)
-        num_x_samples: Int > 0. Number of samples in x direction
-        num_y_samples: Int > 0. Number of samples in y direction
-        scene_center_x: Numeric. Center of image scene in x direction (m)
-        scene_center_y: Numeric. Center of image scene in y direction (m)
         single_precision: Boolean.  If false, it will be double precision.
     
     # References
@@ -54,9 +48,7 @@ class CVData(object):
                  min_azimuth_angle = 0, max_azimuth_angle=360, 
                  min_frequency = 0, max_frequency=20e9,
                  bandwidth=None, center_frequency=None,
-                 taper_func = hamming_window, scene_extent_x = 10, 
-                 scene_extent_y=10, num_x_samples=41,
-                 num_y_samples=41, scene_center_x = 0, scene_center_y=0,
+                 taper_func = hamming_window, 
                  verbose = True, n_jobs=1, single_precision=True):
         
         self.target = target
@@ -65,12 +57,6 @@ class CVData(object):
         maxaz = max_azimuth_angle
         minfreq = min_frequency
         maxfreq = max_frequency
-        Wx = scene_extent_x
-        Wy = scene_extent_y
-        Nx = num_x_samples
-        Ny = num_y_samples
-        x0 = scene_center_x
-        y0 = scene_center_y
         
         if single_precision:
             fdtype = np.float32
@@ -117,13 +103,7 @@ class CVData(object):
         # Apply a 2-D hamming window to CPHD for side-lobe suppression
         if taper_func is not None:
             self.cphd = cdtype(taper_func(self.cphd))
-        
-        # Define the spatial extent with MeshGrid for quicker processing
-        self.x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, Nx, dtype=fdtype)
-        self.y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, Ny, dtype=fdtype)
-        [x_mat, y_mat] = np.meshgrid(self.x_vec, self.y_vec)
-        z_mat = np.zeros(x_mat.shape, fdtype)
-        
+                
         # Determine the azimuth angles of the image pulses (radians)
         AntAz = np.sort(AntAzim*np.pi/180.0)
 
@@ -178,7 +158,6 @@ class CVData(object):
         self.num_samples = K
         self.elevation = AntElev*np.pi/180.0
         self.azimuth = AntAzim*np.pi/180.0
-        self.pos = [x_mat, y_mat, z_mat]
         self.freq = AntFreq
         
     # Return Complex Phase History Data
