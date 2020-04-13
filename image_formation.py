@@ -11,6 +11,57 @@ from multiprocessing import Pool
 from numpy.fft import ifft, fftshift
 import numpy as np
 
+
+def image_projection(sar_obj, num_x_samples, num_y_samples, scene_extent_x,
+                     scene_extent_y, scene_center_x=0, scene_center_y=0,
+                     single_precision=True):
+    """Defines the image plane to project the image onto
+    
+    @author: Ronald Kemker
+
+    The code snippet from examples/civilian_data_dome_example.py shows how to
+    how this function is used.
+
+    # Arguments
+        sar_obj: Object.  Defines the collected CPHD.
+        num_x_samples: Int > 0. Number of samples in x direction
+        num_y_samples: Int > 0. Number of samples in y direction
+        scene_extent_x: Numeric > 0. Scene extent x (m)
+        scene_extent_y: Numeric > 0. Scene extent y (m)
+        scene_center_x: Numeric. Center of image scene in x direction (m)
+        scene_center_y: Numeric. Center of image scene in y direction (m)
+        single_precision: Boolean.  If false, it will be double precision.
+    
+    # References
+        - [Civilian Vehicle Data Dome Overview](
+          https://www.sdms.afrl.af.mil/index.php?collection=cv_dome)
+    """    
+    Nx = num_x_samples
+    Ny = num_y_samples
+    Wx = scene_extent_x
+    Wy = scene_extent_y
+    x0 = scene_center_x
+    y0 = scene_center_y
+    
+    if single_precision:
+        fdtype = np.float32
+    else:
+        fdtype = np.float64
+    
+    x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, Nx, dtype=fdtype)
+    y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, Ny, dtype=fdtype)
+    [x_mat, y_mat] = np.meshgrid(x_vec, y_vec)
+    z_mat = np.zeros(x_mat.shape, fdtype)
+    
+    output_dict = {'x_vec': x_vec,
+                   'y_vec': y_vec,
+                   'x_mat': x_mat,
+                   'y_mat': y_mat,
+                   'z_mat': z_mat,
+                   }
+    
+    return output_dict
+
 # This processes a single pulse (broken out for parallelization)
 def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim, 
                phCorr_exp, min_rvec, max_rvec, r_vec):
@@ -32,7 +83,8 @@ def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim,
     # Update the image using linear interpolation
     return np.interp(dR[idx], r_vec, rc) * phCorr[idx], idx
 
-def backProjection(sar_obj, fft_samples=512, n_jobs=1, single_precision=True):
+def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1, 
+                   single_precision=True):
 
     """Performs backprojection image-formation
     
@@ -53,6 +105,7 @@ def backProjection(sar_obj, fft_samples=512, n_jobs=1, single_precision=True):
 
     # Arguments
         sar_obj: Object. One of the fileIO SAR data readers.
+        image_plane: Object.  Defines the image plane to project onto.
         fft_samples: Int > 0. Number of samples in FFT
         n_jobs: Integer > 0. Number of multiprocessor jobs.
         single_precision: Boolean.  If false, it will be double precision.
@@ -68,16 +121,23 @@ def backProjection(sar_obj, fft_samples=512, n_jobs=1, single_precision=True):
         fdtype = np.float64
         cdtype = np.complex128 
     
+    upsample = 6
+    
     # Required Paramters for Backprojection Algorithm
     cphd = sar_obj.cphd
     freq = sar_obj.freq
     Np = sar_obj.num_pulses
     az = sar_obj.azimuth
     el = sar_obj.elevation
-    x_mat = sar_obj.pos[0]
-    y_mat = sar_obj.pos[1]
-    z_mat = sar_obj.pos[2]
-    Nfft = fft_samples
+    x_mat = image_plane['x_mat']
+    y_mat = image_plane['y_mat']
+    z_mat = image_plane['z_mat']
+    
+    if fft_samples is None:
+        Nfft = 2**(int(np.log2(Np*upsample))+1)
+    else:
+        Nfft = fft_samples
+
     
     c =  fdtype(299792458) # Speed of Light
     deltaF = freq[1] - freq[0]
