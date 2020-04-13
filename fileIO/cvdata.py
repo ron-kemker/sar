@@ -37,7 +37,7 @@ class CVData(object):
         max_frequency: Numeric > 0. Maximum frequency (in Hz)
         bandwidth: Numeric > 0.  Bandwidth to process (in Hz)
         center_freq: Numeric > 0.  Center frequency to process (in Hz)
-        taper_flag: Boolean. Add a hamming taper for sidelobe control
+        taper_func: func. Side-lobe reduction func from singal_processing.py
         scene_extent_x: Numeric > 0. Scene extent x (m)
         scene_extent_y: Numeric > 0. Scene extent y (m)
         num_x_samples: Int > 0. Number of samples in x direction
@@ -54,7 +54,7 @@ class CVData(object):
                  min_azimuth_angle = 0, max_azimuth_angle=360, 
                  min_frequency = 0, max_frequency=20e9,
                  bandwidth=None, center_frequency=None,
-                 taper_flag = True, scene_extent_x = 10, 
+                 taper_func = hamming_window, scene_extent_x = 10, 
                  scene_extent_y=10, num_x_samples=41,
                  num_y_samples=41, scene_center_x = 0, scene_center_y=0,
                  verbose = True, n_jobs=1, single_precision=True):
@@ -115,8 +115,8 @@ class CVData(object):
         [K, Np] = self.cphd.shape 
         
         # Apply a 2-D hamming window to CPHD for side-lobe suppression
-        if taper_flag:
-            self.cphd = cdtype(hamming_window(self.cphd))
+        if taper_func is not None:
+            self.cphd = cdtype(taper_func(self.cphd))
         
         # Define the spatial extent with MeshGrid for quicker processing
         self.x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, Nx, dtype=fdtype)
