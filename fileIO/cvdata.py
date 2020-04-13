@@ -39,6 +39,8 @@ class CVData(object):
         center_freq: Numeric > 0.  Center frequency to process (in Hz)
         taper_func: func. Side-lobe reduction func from singal_processing.py
         single_precision: Boolean.  If false, it will be double precision.
+        altitude: numeric >= 0.0.  The altitude of the simulated collection.
+                  Can be an array if the altitude is not constant.
     
     # References
         - [Civilian Vehicle Data Dome Overview](
@@ -49,7 +51,8 @@ class CVData(object):
                  min_frequency = 0, max_frequency=20e9,
                  bandwidth=None, center_frequency=None,
                  taper_func = hamming_window, 
-                 verbose = True, n_jobs=1, single_precision=True):
+                 verbose = True, n_jobs=1, single_precision=True,
+                 altitude=0):
         
         self.target = target
         pol = polarization
@@ -91,6 +94,11 @@ class CVData(object):
         # Complex phase history data
         self.cphd = cdtype(data[pol][0,0])[freq_idx][:, az_idx]
         
+        if np.isscalar(altitude):
+            self.altitude = altitude * np.ones(az_idx.shape[0], fdtype)
+        else:
+            self.altitude = altitude
+
         # Grab the true collection geometries stored in the data
         AntAzim = fdtype(azim[az_idx])
         AntElev = fdtype(data['elev'][0,0][0,0])
