@@ -36,15 +36,15 @@ elif mode == 'gotcha':
                 bandwidth=300e6,
                 taper_func=taylor_window,
                 )
-    
-    Nx=201
-    Ny=201
+
+    Nx = sar_obj.range_pixels
+    Ny = sar_obj.cross_range_pixels
 
 else:
     raise ValueError('Only supports "cv" and "gotcha".')
 
-Wx=int(sar_obj.Wx)
-Wy=int(sar_obj.Wy)
+Wx=int(sar_obj.range_extent)
+Wy=int(sar_obj.cross_range_extent)
 image_plane = image_projection(sar_obj, Nx, Ny, Wx, Wy)
 image = backProjection(sar_obj, image_plane, fft_samples=512)
-imshow(image, image_plane['x_vec'], image_plane['y_vec'])
+imshow(image)
