@@ -169,6 +169,9 @@ class CVData(object):
         self.freq = AntFreq
         self.bandwidth = (f1-f2)*1e9
         self.delta_r = fdtype(c/(2.0*self.bandwidth))
+        self.Wx = maxWr
+        self.Wy = maxWx
+        self.polarization = pol
 
     # Return Complex Phase History Data
     def getCPHD(self):
