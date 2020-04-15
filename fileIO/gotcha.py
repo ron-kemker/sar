@@ -67,21 +67,30 @@ class GOTCHA(object):
         mat = loadmat(data_path)['data'][0][0]
         self.cphd =cdtype( mat['fp'])
         freq = fdtype(mat['freq'][:,0])
-        self.x = fdtype(mat['x'])[0]
-        self.y = fdtype(mat['y'])[0]
-        self.altitude = fdtype(mat['z'])[0]
-        r0 = fdtype(mat['r0'])
+        x = fdtype(mat['x'])[0]
+        y = fdtype(mat['y'])[0]
+        z = fdtype(mat['z'])[0]
+        r0 = fdtype(mat['r0'][0])
         azim = fdtype(mat['th'][0])
-        elev = fdtype(mat['phi'])
-        af = mat['af'][0][0] # Figure out what to do with this?
-        # r_correct = mat['r_correct']
-        # ph_correct = mat['ph_correct']
+        elev = fdtype(mat['phi'][0])
         
-        # azim = fdtype(data['azim'][0][0][0])
-        # freq = fdtype(data['FGHz'][0,0][:,0] * 1e9)
-        # elev = fdtype(data['elev'][0][0][0][0]) # AKA Grazing angle
+        try:
+            af = mat['af'][0][0]
+            self.af_params = np.vstack([af[0], af[1]])
+        except ValueError:
+            self.af_params = None
+            
+        try:
+            self.r_correct = mat['r_correct']
+        except ValueError:
+            self.r_correct = None
+        
+        try:
+            self.ph_correct = mat['ph_correct']
+        except ValueError:
+            self.ph_correct = None
+            
         incident_angle = 90.0 - np.mean(elev)
-        self.elevation = elev
         
         # If center_frequency and bandwidth defined, override frequency range
         if bandwidth is not None and center_frequency is not None:
@@ -98,7 +107,8 @@ class GOTCHA(object):
         
         # Grab the true collection geometries stored in the data
         AntAzim = fdtype(azim[az_idx])
-        AntElev = elev
+        AntElev = elev[az_idx]
+        AntR0 = r0[az_idx]
         AntFreq = fdtype(freq[freq_idx])
         center_freq = (AntFreq[-1] + AntFreq[0])/2.0
         minF = np.min(AntFreq)
@@ -108,16 +118,13 @@ class GOTCHA(object):
         # Apply a 2-D hamming window to CPHD for side-lobe suppression
         if taper_func is not None:
             self.cphd = cdtype(taper_func(self.cphd))
+                
+        # Determine the azimuth angles of the image pulses (in radians)
+        AntAz = AntAzim*np.pi/180.0
+        AntElev = AntElev*np.pi/180.0
         
-        # Define the spatial extent with MeshGrid for quicker processing
-        # self.x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, Nx, dtype=fdtype)
-        # self.y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, Ny, dtype=fdtype)
-        
-        # Determine the azimuth angles of the image pulses (radians)
-        AntAz = np.sort(AntAzim*np.pi/180.0)
-
         # Determine the average azimuth angle step size (radians)
-        deltaAz = np.abs(np.mean(np.diff(AntAz)))
+        deltaAz = np.abs(np.mean(np.diff(np.sort(AntAz))))
         
         # Determine the total azimuth angle of the aperture (radians)
         totalAz = np.max(AntAz) - np.min(AntAz)
@@ -142,10 +149,10 @@ class GOTCHA(object):
                 dwell_angle = 0.0
 
         # Print off some data statictics (if verbose is on)
-        f1 = AntFreq[0]/1e9
-        f2 = AntFreq[-1]/1e9
-        az1 = np.rad2deg(AntAz[0])
-        az2 = np.rad2deg(AntAz[-1])
+        f1 = np.min(AntFreq)/1e9
+        f2 = np.max(AntFreq)/1e9
+        az1 = np.rad2deg(np.min(AntAz))
+        az2 = np.rad2deg(np.max(AntAz))
         if verbose:
             print('          Incident Angle: %1.0f deg' % incident_angle)
             print(' Elevation/Grazing Angle: %1.0f deg' % np.mean(elev))
@@ -162,21 +169,17 @@ class GOTCHA(object):
             print('             Dwell Angle: %1.1f degrees' % dwell_angle)
             print("")
         
-
         self.num_pulses = Np
         self.num_samples = K
         self.elevation = AntElev*np.pi/180.0
         self.azimuth = AntAzim*np.pi/180.0
         self.freq = AntFreq
-
-    def get_image_plane_projection_params(self):
-        Wx = np.max(self.x) - np.min(self.x)
-        Wy = np.max(self.y) - np.min(self.y)
-        x0 = np.median(self.x)
-        y0 = np.median(self.y)
-        Nx = self.num_pulses 
-        Ny = self.num_pulses
-        return Nx, Ny, Wx, Wy, x0, y0
+        self.bandwidth = (f1-f2)*1e9
+        self.delta_r = fdtype(c/(2.0*self.bandwidth))
+        self.r0 = AntR0
+        self.antenna_location = np.vstack([x, y, z])
+        self.Wx = maxWr
+        self.Wy = maxWx
         
     # Return Complex Phase History Data
     def getCPHD(self):
