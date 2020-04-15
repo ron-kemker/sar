@@ -11,11 +11,11 @@ from multiprocessing import Pool
 from numpy.fft import ifft, fftshift
 import numpy as np
 
-
 def image_projection(sar_obj, num_x_samples, num_y_samples, scene_extent_x,
                      scene_extent_y, scene_center_x=0, scene_center_y=0,
                      single_precision=True):
-    """Defines the image plane to project the image onto
+    """Defines the image plane to project the image onto based on the desired
+        extent of the scene.
     
     @author: Ronald Kemker
 
@@ -42,11 +42,12 @@ def image_projection(sar_obj, num_x_samples, num_y_samples, scene_extent_x,
     Wy = scene_extent_y
     x0 = scene_center_x
     y0 = scene_center_y
-        
+               
     if single_precision:
         fdtype = np.float32
     else:
         fdtype = np.float64
+    
     
     x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, Nx, dtype=fdtype)
     y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, Ny, dtype=fdtype)
@@ -127,7 +128,6 @@ def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1,
     Np = sar_obj.num_pulses
     az = sar_obj.azimuth
     el = sar_obj.elevation
-    alt = sar_obj.altitude
     x_mat = image_plane['x_mat']
     y_mat = image_plane['y_mat']
     
@@ -148,17 +148,18 @@ def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1,
     # Precomputing constant values inside the loop
     min_rvec = np.min(r_vec)
     max_rvec = np.max(r_vec)
-    phCorr_exp = np.complex64(1j*4.0*np.pi*minF/c)
+    phCorr_exp = cdtype(1j*4.0*np.pi*minF/c)
     im_final = np.zeros(x_mat.shape, cdtype);
     
-    z_mat = np.ones(x_mat.shape, fdtype)
+    # TODO: This currently doesn't account for non-flat terrain.
+    z_mat = np.zeros(x_mat.shape, fdtype)
     
     # Multi-processing approach
     if n_jobs > 1:
         args = []
         for ii in range(Np):
             args += [(cphd[:,ii], Nfft, x_mat, y_mat, 
-                     z_mat*alt[ii], el, az[ii], phCorr_exp, 
+                     z_mat, el[ii], az[ii], phCorr_exp, 
                      min_rvec, max_rvec, r_vec)]
 
         with Pool(processes=n_jobs) as pool:
@@ -174,7 +175,7 @@ def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1,
         for ii in range(Np):
             print('\rProcessing: %1.1f%%' % (ii/Np *100.0), end="") 
             [img, idx] = bp_helper(cphd[:,ii], Nfft, x_mat, 
-                    y_mat, z_mat*alt[ii], el, az[ii],  
+                    y_mat, z_mat, el[ii], az[ii],  
                     phCorr_exp, min_rvec, max_rvec, r_vec)
             im_final[idx] = im_final[idx] + img
         
