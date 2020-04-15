@@ -20,11 +20,11 @@ def imshow(im, x_vec=None, y_vec=None, dynamic_range=70):
     img[img > 0] = 0.0
     img[img < -dynamic_range] = -dynamic_range
     plt.imshow(img, cmap='gray')
-    if x_vec is None:
+    if x_vec:
         x_tic = np.linspace(x_vec[0], x_vec[-1], 11)
         x_loc = np.linspace(0, img.shape[0], 11, dtype=np.int32)
         plt.xticks(x_loc, x_tic)
-    if y_vec is None:
+    if y_vec:
         y_tic = np.linspace(y_vec[0], y_vec[-1], 11)
         y_loc = np.linspace(0, img.shape[1], 11, dtype=np.int32)
         plt.yticks(y_loc, y_tic)
