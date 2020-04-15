@@ -176,8 +176,10 @@ class GOTCHA(object):
         self.delta_r = fdtype(c/(2.0*self.bandwidth))
         self.r0 = AntR0
         self.antenna_location = np.vstack([x, y, z])
-        self.Wx = maxWr
-        self.Wy = maxWx
+        self.range_extent = maxWr
+        self.cross_range_extent = maxWx
+        self.range_pixels = int(self.range_extent / dr)
+        self.cross_range_pixels = int(self.cross_range_extent / dx )
         self.polarization = pol
         
     # Return Complex Phase History Data
