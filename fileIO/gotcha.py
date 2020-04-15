@@ -23,7 +23,6 @@ class GOTCHA(object):
 
     # Arguments
         data_path: String. File path to desired data file (.mat)
-        polarization: String.  What polarization to image (HH,HV,VV)
         min_azimuth_angle: Numeric >= 0. Minimum azimuth angle (degrees)
         max_azimuth_angle: Numeric > 0. Maximum azimuth angle (degrees)
         min_frequency: Numeric >= 0. Minimum frequency (in Hz)
@@ -42,8 +41,7 @@ class GOTCHA(object):
                  min_frequency = 0, max_frequency=20e9,
                  bandwidth=None, center_frequency=None,
                  taper_func = hamming_window, 
-                 dynamic_range=70, verbose = True, n_jobs=1,
-                 single_precision=True):
+                 verbose = True, single_precision=True):
         
         pol = data_path.split('.mat')[-2][-2:].lower()
         minaz = np.deg2rad(min_azimuth_angle)
@@ -180,6 +178,7 @@ class GOTCHA(object):
         self.antenna_location = np.vstack([x, y, z])
         self.Wx = maxWr
         self.Wy = maxWx
+        self.polarization = pol
         
     # Return Complex Phase History Data
     def getCPHD(self):
