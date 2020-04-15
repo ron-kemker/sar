@@ -12,7 +12,7 @@ from scipy.stats import ttest_ind
 import time
 
 # Display log-scaled image
-def imshow(im, x_vec=None, y_vec=None, dynamic_range=70):
+def imshow(im, dynamic_range=70):
         
     plt.figure(1, figsize=[10,10])
     img = np.abs(im)/np.max(np.abs(im))
@@ -21,19 +21,6 @@ def imshow(im, x_vec=None, y_vec=None, dynamic_range=70):
     img[img < -dynamic_range] = -dynamic_range
     plt.imshow(img, cmap='gray')
     
-    try:
-        x_tic = np.linspace(x_vec[0], x_vec[-1], 11, dtype=np.int32)
-        x_loc = np.linspace(0, img.shape[0], 11, dtype=np.int32)
-        plt.xticks(x_loc, x_tic)
-    except TypeError:
-        pass
-    
-    try:
-        y_tic = np.linspace(y_vec[0], y_vec[-1], 11, dtype=np.int32)
-        y_loc = np.linspace(0, img.shape[1], 11, dtype=np.int32)
-        plt.yticks(y_loc, y_tic)
-    except TypeError:
-        pass
     
 # Return magnitide-only image from complex-valued image
 def getAmplitudeOnly(img):
