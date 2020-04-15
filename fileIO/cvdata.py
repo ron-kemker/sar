@@ -113,10 +113,10 @@ class CVData(object):
             self.cphd = cdtype(taper_func(self.cphd))
                 
         # Determine the azimuth angles of the image pulses (radians)
-        AntAz = np.sort(AntAzim*np.pi/180.0)
-
+        AntAz = AntAzim*np.pi/180.0
+        AntElev = AntElev*np.pi/180.0
         # Determine the average azimuth angle step size (radians)
-        deltaAz = np.abs(np.mean(np.diff(AntAz)))
+        deltaAz = np.abs(np.mean(np.diff(np.sort(AntAz))))
         
         # Determine the total azimuth angle of the aperture (radians)
         totalAz = np.max(AntAz) - np.min(AntAz)
@@ -141,10 +141,10 @@ class CVData(object):
                 dwell_angle = 0.0
 
         # Print off some data statictics (if verbose is on)
-        f1 = AntFreq[0]/1e9
-        f2 = AntFreq[-1]/1e9
-        az1 = np.rad2deg(AntAz[0])
-        az2 = np.rad2deg(AntAz[-1])
+        f1 = np.min(AntFreq)/1e9
+        f2 = np.max(AntFreq)/1e9
+        az1 = np.rad2deg(np.min(AntAz))
+        az2 = np.rad2deg(np.max(AntAz))
         if verbose:
             print('        Using %s model...' % target)
             print('          Incident Angle: %1.0f deg' % incident_angle)
