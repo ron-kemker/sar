@@ -238,6 +238,7 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True):
         
     #Retrieve relevent parameters
     c           =   299792458.0
+    n_taps      =   101
     Np          =   sar_obj.num_pulses
     K           =   sar_obj.num_samples
     pos         =   sar_obj.antenna_location
@@ -276,16 +277,18 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True):
     range_interp_imag = np.zeros((Np, NPHr), fdtype)
     for i in range(Np):
         kx = 4*np.pi*f/c*pos[0,i]/R0[i] 
-        range_interp_real[i] = np.interp(Kx, kx, cphd.real[:,i])
-        range_interp_imag[i] = np.interp(Kx, kx, cphd.imag[:,i])
+        range_interp_real[i] = poly_int(Kx, kx, cphd.real[:,i], n_taps=n_taps)
+        range_interp_imag[i] = poly_int(Kx, kx, cphd.imag[:,i], n_taps=n_taps)
  
     # Azimuth Interpolation
     az_interp_real = np.zeros((NPHa, NPHr), fdtype)
     az_interp_imag = np.zeros((NPHa, NPHr), fdtype)              
     for i in range(NPHr):
         Ky_keystone = Kx[i] * pos[1]/pos[0]
-        az_interp_real[:,i] = np.interp(Ky, Ky_keystone, range_interp_real[:,i])
-        az_interp_imag[:,i] = np.interp(Ky, Ky_keystone, range_interp_imag[:,i])        
+        az_interp_real[:,i] = poly_int(Ky, Ky_keystone, 
+                                       range_interp_real[:,i], n_taps=n_taps)
+        az_interp_imag[:,i] = poly_int(Ky, Ky_keystone, 
+                                       range_interp_imag[:,i], n_taps=n_taps)        
  
     real_polar = np.nan_to_num(az_interp_real)
     imag_polar = np.nan_to_num(az_interp_imag)    
