@@ -48,4 +48,4 @@ else:
 
 # image_plane = image_projection(sar_obj, Nx, Ny, Wx, Wy)
 image = PFA(sar_obj)
-imshow(image)
+imshow(image.T)
