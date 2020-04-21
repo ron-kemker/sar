@@ -251,14 +251,10 @@ def polar_format_algorithm(sar_obj, single_precision=True,
     pos[0:2] = np.matmul(A , pos[0:2])
     
     # Define the ouput Keystone
-    kaxis = 2*np.pi*f/c
-    s0x = pos[0,0]/R0[0]
-    s0y = pos[1,0]/R0[0]
-    kx = 2*kaxis*s0x
-    ky= 2*kaxis*s0y
+    kx = 4*np.pi*f/c*pos[0,0]/R0[0]
+    ky= 4*np.pi*f/c*pos[1,0]/R0[0]
     kx_min = np.min(kx)
-    s0x = pos[0,center_pulse]/R0[center_pulse]
-    kx = 2 * kaxis * s0x
+    kx = 4*np.pi*f/c * pos[0,center_pulse]/R0[center_pulse]
     Kx = np.linspace(kx_min, np.max(kx), NPHr)
     Ky = np.linspace(-np.max(np.abs(ky)), np.max(np.abs(ky)), NPHa)
     
@@ -266,12 +262,7 @@ def polar_format_algorithm(sar_obj, single_precision=True,
     range_interp_real = np.zeros((Np, NPHr), fdtype)
     range_interp_imag = np.zeros((Np, NPHr), fdtype)
     for i in range(Np):
-        # kaxis = 2*np.pi*f/c
-        s0x = pos[0,i]/R0[i]
-        # s0y = pos[1,i]/R0[i]
-        kx = 2*kaxis*s0x 
-        # ky= 2*kaxis*s0y 
-
+        kx = 4*np.pi*f/c*pos[0,i]/R0[i] 
         range_interp_real[i] = np.interp(Kx, kx, cphd.real[:,i])
         range_interp_imag[i] = np.interp(Kx, kx, cphd.imag[:,i])
  
