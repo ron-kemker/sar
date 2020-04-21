@@ -71,25 +71,7 @@ class GOTCHA(object):
         r0 = fdtype(mat['r0'][0])
         azim = fdtype(mat['th'][0])
         elev = fdtype(mat['phi'][0])
-        
-        try:
-            af = mat['af'][0][0]
-            self.af_params = np.vstack([af[0], af[1]])
-        except ValueError:
-            self.af_params = None
-            
-        try:
-            self.r_correct = mat['r_correct']
-        except ValueError:
-            self.r_correct = None
-        
-        try:
-            self.ph_correct = mat['ph_correct']
-        except ValueError:
-            self.ph_correct = None
-            
-        incident_angle = 90.0 - np.mean(elev)
-        
+                            
         # If center_frequency and bandwidth defined, override frequency range
         if bandwidth is not None and center_frequency is not None:
             half = bandwidth/2.0
@@ -112,6 +94,23 @@ class GOTCHA(object):
         minF = np.min(AntFreq)
         deltaF = AntFreq[1] - AntFreq[0] # Pulse-Bandwidth
         [K, Np] = self.cphd.shape 
+        
+        try:
+            af = mat['af'][0][0]
+            self.af_params = np.vstack([af[0][:,az_idx], af[1][:,az_idx]])
+        except ValueError:
+            self.af_params = None
+            
+        try:
+            self.r_correct = mat['r_correct'][0][az_idx]
+        except ValueError:
+            self.r_correct = None
+        
+        try:
+            self.ph_correct = mat['ph_correct'][0][[az_idx]]
+        except ValueError:
+            self.ph_correct = None
+        
         
         # Apply a 2-D hamming window to CPHD for side-lobe suppression
         if taper_func is not None:
@@ -152,7 +151,6 @@ class GOTCHA(object):
         az1 = np.rad2deg(np.min(AntAz))
         az2 = np.rad2deg(np.max(AntAz))
         if verbose:
-            print('          Incident Angle: %1.0f deg' % incident_angle)
             print(' Elevation/Grazing Angle: %1.0f deg' % np.mean(elev))
             print('  Center Frequency (GHz): %1.1f' % (center_freq/1e9))
             print('   Frequency Range (GHz): %1.2f-%1.2f'%(f1, f2))
@@ -172,7 +170,7 @@ class GOTCHA(object):
         self.elevation = AntElev*np.pi/180.0
         self.azimuth = AntAzim*np.pi/180.0
         self.freq = AntFreq
-        self.bandwidth = (f1-f2)*1e9
+        self.bandwidth = (f2-f1)*1e9
         self.delta_r = fdtype(c/(2.0*self.bandwidth))
         self.r0 = AntR0
         self.antenna_location = np.vstack([x, y, z])
@@ -181,6 +179,13 @@ class GOTCHA(object):
         self.range_pixels = int(self.range_extent / dr)
         self.cross_range_pixels = int(self.cross_range_extent / dx )
         self.polarization = pol
+                
+        mid = Np / 2
+        if mid > 0:
+            self.center_loc = self.antenna_location[:, int(mid)]
+        else:
+            idx = int(mid)
+            self.center_loc = np.mean(self.antenna_location[:, idx:idx+2],1)
         
     # Return Complex Phase History Data
     def getCPHD(self):
