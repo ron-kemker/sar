@@ -212,8 +212,22 @@ def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1,
 
 
 
-def polar_format_algorithm(sar_obj, single_precision=True,
-                           upsample=True, i_func=np.interp):
+def polar_format_algorithm(sar_obj, single_precision=True, upsample=True):
+
+    """Performs polar format algorithm for image-formation
+    
+    @author: Ronald Kemker
+
+    See examples/basic_example.py for example.
+
+    # Arguments
+        sar_obj: Object. One of the fileIO SAR data readers.
+        single_precision: Boolean.  If false, it will be double precision.
+        upsample : Boolean. Should we upsample to the nearest power of 2.
+            
+    # References
+        - Carrera, Goodman, and Majewski (1995).
+    """
     
     if single_precision:
         fdtype = np.float32
