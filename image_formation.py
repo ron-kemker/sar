@@ -242,7 +242,7 @@ def polar_format_algorithm(sar_obj, single_precision=True,
     center_pulse = int(Np/2)
     R0 = np.sqrt(np.sum(pos**2, 0))
     
-    # Rotate the XY-axis
+    # Rotate the XY-plane
     theta = np.arctan2(pos[1, center_pulse], pos[0, center_pulse])
     A = np.array([np.cos(theta), np.sin(theta), -np.sin(theta), 
                   np.cos(theta)]).reshape(2,2)
@@ -276,7 +276,6 @@ def polar_format_algorithm(sar_obj, single_precision=True,
     real_polar = np.nan_to_num(az_interp_real)
     imag_polar = np.nan_to_num(az_interp_imag)    
     phs_polar = np.nan_to_num(real_polar+1j*imag_polar)
-    phs_polar = hamming_window(phs_polar)
     
     # 2-D FFT
     im_final = fftshift(fft2(fftshift(phs_polar)))
