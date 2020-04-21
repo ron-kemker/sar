@@ -10,6 +10,7 @@ from scipy.io import loadmat
 import numpy as np
 import warnings
 from signal_processing import hamming_window
+from glob import glob
 
 class GOTCHA(object):
     """Processes the AFRL GOTCHA Data
@@ -36,16 +37,16 @@ class GOTCHA(object):
         - [GOTCHA Volumetric SAR Dataset Overview](
           https://www.sdms.afrl.af.mil/index.php?collection=gotcha)
     """
-    def __init__(self, data_path, min_azimuth_angle = 0, 
-                 max_azimuth_angle=360, 
+    def __init__(self, data_path, min_azimuth_angle = -180, 
+                 max_azimuth_angle=180, 
                  min_frequency = 0, max_frequency=20e9,
                  bandwidth=None, center_frequency=None,
                  taper_func = hamming_window, 
                  verbose = True, single_precision=True):
         
-        pol = data_path.split('.mat')[-2][-2:].lower()
-        minaz = np.deg2rad(min_azimuth_angle)
-        maxaz = np.deg2rad(max_azimuth_angle)
+        pol = data_path.split('\\')[-1].lower()
+        minaz = min_azimuth_angle
+        maxaz = max_azimuth_angle
         minfreq = min_frequency
         maxfreq = max_frequency
         
@@ -58,19 +59,21 @@ class GOTCHA(object):
         
         c = fdtype(299792458) # Speed of Light
         
+        self.cphd = None
+        self.r0 = np.zeros((0, ), dtype=fdtype)
+        self.azim = np.zeros((0, ), dtype=fdtype)
+        self.elev = np.zeros((0, ), dtype=fdtype)
+        self.freq = None
+        self.antenna_location = np.zeros((3, 0), dtype=fdtype)
+        self.r_correct = None
+        self.ph_correct = None
+        self.af_params = np.zeros((2, 0), dtype=fdtype)
+
+        files = glob(data_path +  '/*.mat')
+
         # Load model data
-        filename = data_path.split('\\')[-1]
-        if verbose:
-            print('Loading %s...\n' % filename)
-        mat = loadmat(data_path)['data'][0][0]
-        self.cphd =cdtype( mat['fp'])
-        freq = fdtype(mat['freq'][:,0])
-        x = fdtype(mat['x'])[0]
-        y = fdtype(mat['y'])[0]
-        z = fdtype(mat['z'])[0]
-        r0 = fdtype(mat['r0'][0])
-        azim = fdtype(mat['th'][0])
-        elev = fdtype(mat['phi'][0])
+        for f in files: 
+            self.readMATFile(f)
                             
         # If center_frequency and bandwidth defined, override frequency range
         if bandwidth is not None and center_frequency is not None:
@@ -79,39 +82,27 @@ class GOTCHA(object):
             maxfreq = center_frequency + half
         
         # Only grab phase history over desired azimuth and frequency range 
-        az_idx = np.logical_and(azim >= minaz, azim <= maxaz)
-        freq_idx = np.logical_and(freq >= minfreq, freq <= maxfreq)
+        az_idx = np.logical_and(self.azim >= minaz, self.azim <= maxaz)
+        freq_idx = np.logical_and(self.freq >= minfreq, self.freq <= maxfreq)
         
         # Complex phase history data
-        self.cphd = self.cphd[freq_idx][:, az_idx]
+        self.cphd = cdtype(self.cphd[freq_idx][:, az_idx])
+        [K, Np] = self.cphd.shape
         
         # Grab the true collection geometries stored in the data
-        AntAzim = fdtype(azim[az_idx])
-        AntElev = elev[az_idx]
-        AntR0 = r0[az_idx]
-        AntFreq = fdtype(freq[freq_idx])
+        AntAzim = self.azim[az_idx]
+        AntElev = self.elev[az_idx]
+        AntR0 = self.r0[az_idx]
+        self.antenna_location = self.antenna_location[:, az_idx]
+        
+        if self.af_params.shape[1] > 0:
+            self.af_params = self.af_params[:, az_idx]
+        
+        AntFreq = self.freq[freq_idx]
         center_freq = (AntFreq[-1] + AntFreq[0])/2.0
         minF = np.min(AntFreq)
         deltaF = AntFreq[1] - AntFreq[0] # Pulse-Bandwidth
-        [K, Np] = self.cphd.shape 
-        
-        try:
-            af = mat['af'][0][0]
-            self.af_params = np.vstack([af[0][:,az_idx], af[1][:,az_idx]])
-        except ValueError:
-            self.af_params = None
-            
-        try:
-            self.r_correct = mat['r_correct'][0][az_idx]
-        except ValueError:
-            self.r_correct = None
-        
-        try:
-            self.ph_correct = mat['ph_correct'][0][[az_idx]]
-        except ValueError:
-            self.ph_correct = None
-        
-        
+               
         # Apply a 2-D hamming window to CPHD for side-lobe suppression
         if taper_func is not None:
             self.cphd = cdtype(taper_func(self.cphd))
@@ -151,7 +142,7 @@ class GOTCHA(object):
         az1 = np.rad2deg(np.min(AntAz))
         az2 = np.rad2deg(np.max(AntAz))
         if verbose:
-            print(' Elevation/Grazing Angle: %1.0f deg' % np.mean(elev))
+            print(' Elevation/Grazing Angle: %1.0f deg' % np.mean(self.elev))
             print('  Center Frequency (GHz): %1.1f' % (center_freq/1e9))
             print('   Frequency Range (GHz): %1.2f-%1.2f'%(f1, f2))
             print('  Maximum wavelength [m]: %1.1e' % (maxLambda))
@@ -173,7 +164,7 @@ class GOTCHA(object):
         self.bandwidth = (f2-f1)*1e9
         self.delta_r = fdtype(c/(2.0*self.bandwidth))
         self.r0 = AntR0
-        self.antenna_location = np.vstack([x, y, z])
+        # self.antenna_location = np.vstack([x, y, z])
         self.range_extent = maxWr
         self.cross_range_extent = maxWx
         self.range_pixels = int(self.range_extent / dr)
@@ -186,7 +177,45 @@ class GOTCHA(object):
         else:
             idx = int(mid)
             self.center_loc = np.mean(self.antenna_location[:, idx:idx+2],1)
+    
+    def readMATFile(self, file_name):
+        mat = loadmat(file_name)['data'][0][0]
         
+        if self.cphd is None:
+            self.cphd = mat['fp']
+        else:
+            self.cphd = np.append(self.cphd, mat['fp'], axis=1)
+
+        if self.freq is None:
+            self.freq = mat['freq'][:, 0]
+            
+        x = mat['x'][0]
+        y = mat['y'][0]
+        z = mat['z'][0]
+        self.antenna_location = np.append(self.antenna_location, 
+                                          np.vstack([x, y, z]), axis=1)
+        
+        self.r0 =  np.append(self.r0 , mat['r0'][0])
+        self.azim = np.append(self.azim, mat['th'][0])
+        self.elev = np.append(self.elev, mat['phi'][0])
+        
+        try:
+            af = mat['af'][0][0]
+            self.af_params = np.append(self.af_params, 
+                                       np.vstack([af[0], af[1]]), axis=1)
+        except ValueError:
+            pass
+            
+        try:
+            self.r_correct = mat['r_correct'][0][az_idx]
+        except ValueError:
+            self.r_correct = None
+        
+        try:
+            self.ph_correct = mat['ph_correct'][0][[az_idx]]
+        except ValueError:
+            self.ph_correct = None
+    
     # Return Complex Phase History Data
     def getCPHD(self):
         return self.cphd
