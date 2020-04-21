@@ -241,8 +241,6 @@ def polar_format_algorithm(sar_obj, single_precision=True,
     # Computer other useful variables
     center_pulse = int(Np/2)
     R0 = np.sqrt(np.sum(pos**2, 0))
-    # s0x = pos[0]/R0
-    # s0y = pos[1]/R0
     
     # Rotate the XY-axis
     theta = np.arctan2(pos[1, center_pulse], pos[0, center_pulse])
@@ -255,8 +253,9 @@ def polar_format_algorithm(sar_obj, single_precision=True,
     ky= 4*np.pi*f/c*pos[1,0]/R0[0]
     kx_min = np.min(kx)
     kx = 4*np.pi*f/c * pos[0,center_pulse]/R0[center_pulse]
-    Kx = np.linspace(kx_min, np.max(kx), NPHr)
-    Ky = np.linspace(-np.max(np.abs(ky)), np.max(np.abs(ky)), NPHa)
+    Kx = np.linspace(kx_min, np.max(kx), NPHr, dtype=fdtype)
+    Ky = np.linspace(-np.max(np.abs(ky)), np.max(np.abs(ky)), NPHa, 
+                     dtype=fdtype)
     
     # Range Interpolation
     range_interp_real = np.zeros((Np, NPHr), fdtype)
