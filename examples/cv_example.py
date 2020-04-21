@@ -19,8 +19,8 @@ sar_obj = CVData(data_path, target,
             center_frequency=9.6e9, 
             bandwidth=300e6,
             taper_func=hamming_window,
-            # min_azimuth_angle = 41,
-            # max_azimuth_angle = 45,
+            min_azimuth_angle = 41,
+            max_azimuth_angle = 45,
             )
 
 image = backProjection(sar_obj, num_x_samples=51, num_y_samples=51)
