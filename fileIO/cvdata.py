@@ -78,8 +78,6 @@ class CVData(object):
         azim = fdtype(data['azim'][0][0][0])
         freq = fdtype(data['FGHz'][0,0][:,0] * 1e9)
         elev = fdtype(data['elev'][0][0][0][0]) # AKA Grazing angle
-        incident_angle = 90 - elev
-        # self.elevation = elev
         
         # If center_frequency and bandwidth defined, override frequency range
         if bandwidth is not None and center_frequency is not None:
@@ -122,9 +120,7 @@ class CVData(object):
         totalAz = np.max(AntAz) - np.min(AntAz)
         
         # Determine the maximum wavelength (m)
-        # The next line was provided by AFRL, but I think it is wrong.
-        # maxLambda = c / (minF[0] + (deltaF * K)) # this is minLambda
-        maxLambda = c / minF # This is what maxLambda should be I think
+        maxLambda = c / minF 
         
         # Determine the maximum scene size of the image (m)
         maxWr = c/(2*deltaF)  
@@ -147,7 +143,6 @@ class CVData(object):
         az2 = np.rad2deg(np.max(AntAz))
         if verbose:
             print('        Using %s model...' % target)
-            print('          Incident Angle: %1.0f deg' % incident_angle)
             print(' Elevation/Grazing Angle: %1.0f deg' % elev)
             print('  Center Frequency (GHz): %1.1f' % (center_freq/1e9))
             print('   Frequency Range (GHz): %1.2f-%1.2f'%(f1, f2))
