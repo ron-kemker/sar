@@ -8,12 +8,16 @@ Author: Ronald Kemker
 '''
 
 from multiprocessing import Pool
-from numpy.fft import ifft, fftshift
+from numpy.fft import ifft, fftshift, fft2
+from numpy.linalg import norm
 import numpy as np
+from utils import polyphase_interp as poly_int
+from signal_processing import hamming_window
+from scipy.stats import linregress
 
 def image_projection(sar_obj, num_x_samples, num_y_samples, scene_extent_x,
                      scene_extent_y, scene_center_x=0, scene_center_y=0,
-                     single_precision=True):
+                     single_precision=True, upsample=True, res_factor=1.0):
     """Defines the image plane to project the image onto based on the desired
         extent of the scene.
     
@@ -48,22 +52,46 @@ def image_projection(sar_obj, num_x_samples, num_y_samples, scene_extent_x,
     else:
         fdtype = np.float64
     
-    
-    x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, Nx, dtype=fdtype)
-    y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, Ny, dtype=fdtype)
+    num_samples = sar_obj.num_samples
+    num_pulses = sar_obj.num_pulses
+    delta_r = sar_obj.delta_r
+    aspect = Wy/Wx
+        
+    #Define image plane parameters
+    if upsample:
+        nu= 2**int(np.log2(num_samples)+bool(np.mod(np.log2(num_samples),1)))
+        nv= 2**int(np.log2(num_pulses)+bool(np.mod(np.log2(num_pulses),1)))
+    else:
+        nu= num_samples
+        nv= num_pulses
+
+    # Define range and cross-range locations
+    x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, nu, dtype=fdtype)
+    y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, nv, dtype=fdtype)
     [x_mat, y_mat] = np.meshgrid(x_vec, y_vec)
+
+    #Define resolution.  This should be less than the system resolution limits
+    du = delta_r*res_factor*num_samples/nu
+    dv = aspect*du
+        
+    #Derive image plane spatial frequencies
+    k_u = 2*np.pi*np.linspace(-1.0/(2*du), 1.0/(2*du), nu, dtype=fdtype)
+    k_v = 2*np.pi*np.linspace(-1.0/(2*dv), 1.0/(2*dv), nv, dtype=fdtype)   
     
     output_dict = {'x_vec': x_vec,
                    'y_vec': y_vec,
                    'x_mat': x_mat,
                    'y_mat': y_mat,
+                   'k_u' : k_u,
+                   'k_v' : k_v,
                    }
     
     return output_dict
 
 # This processes a single pulse (broken out for parallelization)
 def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim, 
-               phCorr_exp, min_rvec, max_rvec, r_vec):
+               phCorr_exp, min_rvec, max_rvec, r_vec, 
+               interp_func=np.interp):
                 
     # Form the range profile with zero padding added
     rc = fftshift(ifft(ph_data,Nfft))
@@ -80,7 +108,7 @@ def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim,
     idx = np.logical_and(dR > min_rvec, dR < max_rvec)
 
     # Update the image using linear interpolation
-    return np.interp(dR[idx], r_vec, rc) * phCorr[idx], idx
+    return interp_func(dR[idx], r_vec, rc) * phCorr[idx], idx
 
 def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1, 
                    single_precision=True):
@@ -181,3 +209,85 @@ def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1,
         
     print("") 
     return im_final    
+
+
+
+def polar_format_algorithm(sar_obj, single_precision=True,
+                           upsample=True, i_func=np.interp):
+    
+    if single_precision:
+        fdtype = np.float32
+        cdtype = np.complex64
+    else:
+        fdtype = np.float64
+        cdtype = np.complex128
+        
+    #Retrieve relevent parameters
+    c           =   299792458.0
+    Np          =   sar_obj.num_pulses
+    K           =   sar_obj.num_samples
+    pos         =   sar_obj.antenna_location
+    cphd        =   sar_obj.cphd
+    f           =   sar_obj.freq
+
+    #Define image plane parameters
+    if upsample:
+        NPHr= 2**int(np.log2(K)+bool(np.mod(np.log2(K),1)))
+        NPHa= 2**int(np.log2(Np)+bool(np.mod(np.log2(Np),1)))
+    else:
+        NPHr = K
+        NPHa = Np  
+    
+    # Computer other useful variables
+    center_pulse = int(Np/2)
+    R0 = np.sqrt(np.sum(pos**2, 0))
+    # s0x = pos[0]/R0
+    # s0y = pos[1]/R0
+    
+    # Rotate the XY-axis
+    theta = np.arctan2(pos[1, center_pulse], pos[0, center_pulse])
+    A = np.array([np.cos(theta), np.sin(theta), -np.sin(theta), 
+                  np.cos(theta)]).reshape(2,2)
+    pos[0:2] = np.matmul(A , pos[0:2])
+    
+    # Define the ouput Keystone
+    kaxis = 2*np.pi*f/c
+    s0x = pos[0,0]/R0[0]
+    s0y = pos[1,0]/R0[0]
+    kx = 2*kaxis*s0x
+    ky= 2*kaxis*s0y
+    kx_min = np.min(kx)
+    s0x = pos[0,center_pulse]/R0[center_pulse]
+    kx = 2 * kaxis * s0x
+    Kx = np.linspace(kx_min, np.max(kx), NPHr)
+    Ky = np.linspace(-np.max(np.abs(ky)), np.max(np.abs(ky)), NPHa)
+    
+    # Range Interpolation
+    range_interp_real = np.zeros((Np, NPHr), fdtype)
+    range_interp_imag = np.zeros((Np, NPHr), fdtype)
+    for i in range(Np):
+        # kaxis = 2*np.pi*f/c
+        s0x = pos[0,i]/R0[i]
+        # s0y = pos[1,i]/R0[i]
+        kx = 2*kaxis*s0x 
+        # ky= 2*kaxis*s0y 
+
+        range_interp_real[i] = np.interp(Kx, kx, cphd.real[:,i])
+        range_interp_imag[i] = np.interp(Kx, kx, cphd.imag[:,i])
+ 
+    # Azimuth Interpolation
+    az_interp_real = np.zeros((NPHa, NPHr), fdtype)
+    az_interp_imag = np.zeros((NPHa, NPHr), fdtype)              
+    for i in range(NPHr):
+        Ky_keystone = Kx[i] * pos[1]/pos[0]
+        az_interp_real[:,i] = np.interp(Ky, Ky_keystone, range_interp_real[:,i])
+        az_interp_imag[:,i] = np.interp(Ky, Ky_keystone, range_interp_imag[:,i])        
+ 
+    real_polar = np.nan_to_num(az_interp_real)
+    imag_polar = np.nan_to_num(az_interp_imag)    
+    phs_polar = np.nan_to_num(real_polar+1j*imag_polar)
+    phs_polar = hamming_window(phs_polar)
+    
+    # 2-D FFT
+    im_final = fftshift(fft2(fftshift(phs_polar)))
+    return cdtype(im_final)
