@@ -16,15 +16,23 @@ def hamming_window(cphd):
     taper_window = np.matmul(hamming1, hamming2)
     return cphd * taper_window
 
-# This applies a Taylor window to the CPHD file (side-lobe suppression)
-def taylor_window(cphd , sidelobe=43):
+# This applies a Hamming window to the CPHD file (side-lobe suppression)
+def hanning_window(cphd):
     [K, Np] = cphd.shape
-    taylor1 = taylor(K, sidelobe)[np.newaxis].T
+    hamming1 = np.hanning(K)[np.newaxis].T
+    hamming2 = np.hanning(Np)[np.newaxis]
+    taper_window = np.matmul(hamming1, hamming2)
+    return cphd * 2.0 * taper_window
+
+# This applies a Taylor window to the CPHD file (side-lobe suppression)
+def taylor_window(cphd , sidelobe=30, n_bar=4):
+    [K, Np] = cphd.shape
+    taylor1 = taylor(K, sidelobe, n_bar)[np.newaxis].T
     taylor2 = taylor(Np, sidelobe)[np.newaxis]
     taper_window = np.matmul(taylor1, taylor2)   
     return cphd * taper_window
 
-def taylor(N, sidelobe=43):
+def taylor(N, sidelobe, n_bar=None):
     """
     
     Parameters
@@ -38,9 +46,11 @@ def taylor(N, sidelobe=43):
 
     """
     xi = np.linspace(-0.5, 0.5, N)
-    A = 1.0/np.pi*np.arccosh(10**(sidelobe*1.0/20))
-    n_bar = int(2*A**2+0.5)+1
-    sigma_p = n_bar/np.sqrt(A**2+(n_bar-0.5)**2)
+    A = np.arccosh(10.0**(sidelobe/20.0))/np.pi
+    
+    if n_bar is None:
+        n_bar = int(2*A**2+0.5)+1
+    sigma_p = n_bar**2 / (A**2 + (n_bar-0.5)**2)
     
     #Compute F_m
     m = np.arange(1,n_bar)
@@ -51,7 +61,7 @@ def taylor(N, sidelobe=43):
         den = 1
         for j in n:
             num = num*\
-            (-1)**(i+1)*(1-i**2*1.0/sigma_p**2/(\
+            (-1)**(i+1)*(1-i**2*1.0/sigma_p/(\
                             A**2+(j-0.5)**2))
             if i!=j:
                 den = den*(1-i**2*1.0/j**2)
