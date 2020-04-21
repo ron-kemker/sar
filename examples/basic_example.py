@@ -9,6 +9,7 @@ Author: Ronald Kemker
 from fileIO.cvdata import CVData
 from fileIO.gotcha import GOTCHA
 from image_formation import backProjection, image_projection
+from image_formation import polar_format_algorithm as PFA
 from utils import imshow
 from signal_processing import taylor_window, hamming_window
 
@@ -30,11 +31,13 @@ if mode == 'cv':
     Ny=51
 
 elif mode == 'gotcha':
-    data_path ='..\..\data\GOTCHA\DATA\pass8\HH\data_3dsar_pass8_az001_HH.mat'
+    data_path ='..\..\data\GOTCHA\DATA\pass8\HH'
     sar_obj = GOTCHA(data_path,
                 center_frequency=9.6e9, 
                 bandwidth=300e6,
                 taper_func=taylor_window,
+                min_azimuth_angle=40,
+                max_azimuth_angle=45
                 )
 
     Nx = sar_obj.range_pixels
@@ -43,8 +46,6 @@ elif mode == 'gotcha':
 else:
     raise ValueError('Only supports "cv" and "gotcha".')
 
-Wx=int(sar_obj.range_extent)
-Wy=int(sar_obj.cross_range_extent)
-image_plane = image_projection(sar_obj, Nx, Ny, Wx, Wy)
-image = backProjection(sar_obj, image_plane, fft_samples=512)
+# image_plane = image_projection(sar_obj, Nx, Ny, Wx, Wy)
+image = PFA(sar_obj)
 imshow(image)
