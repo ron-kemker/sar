@@ -156,7 +156,6 @@ def backProjection(sar_obj, fft_samples=None, n_jobs=1,
     return im_final    
 
 
-
 def polar_format_algorithm(sar_obj, single_precision=True, upsample=True):
 
     """Performs polar format algorithm for image-formation
