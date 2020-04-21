@@ -12,56 +12,6 @@ from numpy.fft import ifft, fftshift, fft2
 import numpy as np
 from utils import polyphase_interp as poly_int
 
-def image_projection(sar_obj, num_x_samples, num_y_samples, scene_extent_x,
-                     scene_extent_y, scene_center_x=0, scene_center_y=0,
-                     single_precision=True, upsample=True):
-    """Defines the image plane to project the image onto based on the desired
-        extent of the scene.
-    
-    @author: Ronald Kemker
-
-    The code snippet from examples/civilian_data_dome_example.py shows how to
-    how this function is used.
-
-    # Arguments
-        sar_obj: Object.  Defines the collected CPHD.
-        num_x_samples: Int > 0. Number of samples in x direction
-        num_y_samples: Int > 0. Number of samples in y direction
-        scene_extent_x: Numeric > 0. Scene extent x (m)
-        scene_extent_y: Numeric > 0. Scene extent y (m)
-        scene_center_x: Numeric. Center of image scene in x direction (m)
-        scene_center_y: Numeric. Center of image scene in y direction (m)
-        single_precision: Boolean.  If false, it will be double precision.
-    
-    # References
-        - [Civilian Vehicle Data Dome Overview](
-          https://www.sdms.afrl.af.mil/index.php?collection=cv_dome)
-    """    
-    Wx = scene_extent_x
-    Wy = scene_extent_y
-    x0 = scene_center_x
-    y0 = scene_center_y
-               
-    if single_precision:
-        fdtype = np.float32
-    else:
-        fdtype = np.float64
-    
-    num_samples = sar_obj.num_samples
-    num_pulses = sar_obj.num_pulses
-        
-    # Define range and cross-range locations
-    x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, num_samples, dtype=fdtype)
-    y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, num_pulses, dtype=fdtype)
-    [x_mat, y_mat] = np.meshgrid(x_vec, y_vec)
-      
-    output_dict = {'x_vec': x_vec,
-                   'y_vec': y_vec,
-                   'x_mat': x_mat,
-                   'y_mat': y_mat,
-                   }
-    
-    return output_dict
 
 # This processes a single pulse (broken out for parallelization)
 def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim, 
@@ -86,7 +36,10 @@ def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim,
     return interp_func(dR[idx], r_vec, rc) * phCorr[idx], idx
 
 def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1, 
-                   single_precision=True):
+                   single_precision=True, 
+                   num_x_samples=501, num_y_samples=501, 
+                   scene_extent_x=None, scene_extent_y=None, 
+                   scene_center_x=0, scene_center_y=0,):
 
     """Performs backprojection image-formation
     
@@ -95,12 +48,9 @@ def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1,
     This code snippet will load and display the data dome data:
     data_path = '..\..\data\Civilian Vehicles\Domes\Camry\Camry_el30.0000.mat'        
     cvdata = CVData(data_path, 'camry', 
-                    min_azimuth_angle=44, 
-                    max_azimuth_angle=46, 
                     polarization='vv',
                     center_frequency=9.6e9, 
                     bandwidth=300e6,
-                    taper_flag=True,
                     )
     image = backProjection(cvdata)
     imshow(image, cvdata.x_vec, cvdata.y_vec)
@@ -111,9 +61,16 @@ def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1,
         fft_samples: Int > 0. Number of samples in FFT
         n_jobs: Integer > 0. Number of multiprocessor jobs.
         single_precision: Boolean.  If false, it will be double precision.
+        num_x_samples: Int > 0. Number of samples in x direction
+        num_y_samples: Int > 0. Number of samples in y direction
+        scene_extent_x: Numeric > 0. Scene extent x (m)
+        scene_extent_y: Numeric > 0. Scene extent y (m)
+        scene_center_x: Numeric. Center of image scene in x direction (m)
+        scene_center_y: Numeric. Center of image scene in y direction (m)
     
     # References
-        - TODO
+        - [Civilian Vehicle Data Dome Overview](
+          https://www.sdms.afrl.af.mil/index.php?collection=cv_dome)
     """
     
     if single_precision:
@@ -124,15 +81,30 @@ def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1,
         cdtype = np.complex128 
     
     upsample = 6
-    
+    c =  fdtype(299792458) # Speed of Light
+
     # Required Paramters for Backprojection Algorithm
+    if scene_extent_x is None:
+        Wx = sar_obj.range_extent
+    else:
+        Wx = scene_extent_x
+        
+    if scene_extent_y is None:
+        Wy = sar_obj.cross_range_extent
+    else:
+        Wy = scene_extent_y
+    
+    x0 = scene_center_x
+    y0 = scene_center_y
     cphd = sar_obj.cphd
     freq = sar_obj.freq
     Np = sar_obj.num_pulses
     az = sar_obj.azimuth
     el = sar_obj.elevation
-    x_mat = image_plane['x_mat']
-    y_mat = image_plane['y_mat']
+
+    x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, num_x_samples, dtype=fdtype)
+    y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, num_y_samples, dtype=fdtype)
+    [x_mat, y_mat] = np.meshgrid(x_vec, y_vec)
     
     if fft_samples is None:
         Nfft = 2**(int(np.log2(Np*upsample))+1)
@@ -140,7 +112,6 @@ def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1,
         Nfft = fft_samples
 
     
-    c =  fdtype(299792458) # Speed of Light
     deltaF = freq[1] - freq[0]
     maxWr = c/(2*deltaF)
     minF = np.min(freq)
