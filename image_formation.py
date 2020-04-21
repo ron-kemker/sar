@@ -35,7 +35,7 @@ def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim,
     # Update the image using linear interpolation
     return interp_func(dR[idx], r_vec, rc) * phCorr[idx], idx
 
-def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1, 
+def backProjection(sar_obj, fft_samples=None, n_jobs=1, 
                    single_precision=True, 
                    num_x_samples=501, num_y_samples=501, 
                    scene_extent_x=None, scene_extent_y=None, 
@@ -57,7 +57,6 @@ def backProjection(sar_obj, image_plane, fft_samples=None, n_jobs=1,
 
     # Arguments
         sar_obj: Object. One of the fileIO SAR data readers.
-        image_plane: Object.  Defines the image plane to project onto.
         fft_samples: Int > 0. Number of samples in FFT
         n_jobs: Integer > 0. Number of multiprocessor jobs.
         single_precision: Boolean.  If false, it will be double precision.
