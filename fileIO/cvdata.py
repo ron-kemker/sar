@@ -14,18 +14,7 @@ class CVData(object):
     
     @author: Ronald Kemker
 
-    This code snippet will load and display the data dome data:
-    data_path = '..\..\data\Civilian Vehicles\Domes\Camry\Camry_el30.0000.mat'        
-    cvdata = CVData(data_path, 'camry', 
-                    min_azimuth_angle=44, 
-                    max_azimuth_angle=46, 
-                    polarization='vv',
-                    center_frequency=9.6e9, 
-                    bandwidth=300e6,
-                    taper_flag=True,
-                    )
-    image = backProjection(cvdata)
-    imshow(image, cvdata.x_vec, cvdata.y_vec)
+    See examples/cv_example.py for example code.
 
     # Arguments
         data_path: String. File path to desired data file (.mat)
