@@ -118,9 +118,7 @@ class GOTCHA(object):
         totalAz = np.max(AntAz) - np.min(AntAz)
         
         # Determine the maximum wavelength (m)
-        # The next line was provided by AFRL, but I think it is wrong.
-        # maxLambda = c / (minF[0] + (deltaF * K)) # this is minLambda
-        maxLambda = c / minF # This is what maxLambda should be I think
+        maxLambda = c / minF 
         
         # Determine the maximum scene size of the image (m)
         maxWr = c/(2*deltaF)  
@@ -207,12 +205,12 @@ class GOTCHA(object):
             pass
             
         try:
-            self.r_correct = mat['r_correct'][0][az_idx]
+            self.r_correct = mat['r_correct'][0]
         except ValueError:
             self.r_correct = None
         
         try:
-            self.ph_correct = mat['ph_correct'][0][[az_idx]]
+            self.ph_correct = mat['ph_correct'][0]
         except ValueError:
             self.ph_correct = None
     
