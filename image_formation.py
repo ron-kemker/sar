@@ -9,15 +9,12 @@ Author: Ronald Kemker
 
 from multiprocessing import Pool
 from numpy.fft import ifft, fftshift, fft2
-from numpy.linalg import norm
 import numpy as np
 from utils import polyphase_interp as poly_int
-from signal_processing import hamming_window
-from scipy.stats import linregress
 
 def image_projection(sar_obj, num_x_samples, num_y_samples, scene_extent_x,
                      scene_extent_y, scene_center_x=0, scene_center_y=0,
-                     single_precision=True, upsample=True, res_factor=1.0):
+                     single_precision=True, upsample=True):
     """Defines the image plane to project the image onto based on the desired
         extent of the scene.
     
@@ -40,8 +37,6 @@ def image_projection(sar_obj, num_x_samples, num_y_samples, scene_extent_x,
         - [Civilian Vehicle Data Dome Overview](
           https://www.sdms.afrl.af.mil/index.php?collection=cv_dome)
     """    
-    Nx = num_x_samples
-    Ny = num_y_samples
     Wx = scene_extent_x
     Wy = scene_extent_y
     x0 = scene_center_x
@@ -54,36 +49,16 @@ def image_projection(sar_obj, num_x_samples, num_y_samples, scene_extent_x,
     
     num_samples = sar_obj.num_samples
     num_pulses = sar_obj.num_pulses
-    delta_r = sar_obj.delta_r
-    aspect = Wy/Wx
         
-    #Define image plane parameters
-    if upsample:
-        nu= 2**int(np.log2(num_samples)+bool(np.mod(np.log2(num_samples),1)))
-        nv= 2**int(np.log2(num_pulses)+bool(np.mod(np.log2(num_pulses),1)))
-    else:
-        nu= num_samples
-        nv= num_pulses
-
     # Define range and cross-range locations
-    x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, nu, dtype=fdtype)
-    y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, nv, dtype=fdtype)
+    x_vec = np.linspace(x0 - Wx/2, x0 + Wx/2, num_samples, dtype=fdtype)
+    y_vec = np.linspace(y0 - Wy/2, y0 + Wy/2, num_pulses, dtype=fdtype)
     [x_mat, y_mat] = np.meshgrid(x_vec, y_vec)
-
-    #Define resolution.  This should be less than the system resolution limits
-    du = delta_r*res_factor*num_samples/nu
-    dv = aspect*du
-        
-    #Derive image plane spatial frequencies
-    k_u = 2*np.pi*np.linspace(-1.0/(2*du), 1.0/(2*du), nu, dtype=fdtype)
-    k_v = 2*np.pi*np.linspace(-1.0/(2*dv), 1.0/(2*dv), nv, dtype=fdtype)   
-    
+      
     output_dict = {'x_vec': x_vec,
                    'y_vec': y_vec,
                    'x_mat': x_mat,
                    'y_mat': y_mat,
-                   'k_u' : k_u,
-                   'k_v' : k_v,
                    }
     
     return output_dict
