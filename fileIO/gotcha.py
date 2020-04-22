@@ -198,7 +198,7 @@ class GOTCHA(object):
                                           np.vstack([x, y, z]), axis=1)
         
         self.r0 =  np.append(self.r0 , mat['r0'][0])
-        self.azim = np.append(self.azim, mat['th'][0])
+        self.azim = np.append(self.azim, azim)
         self.elev = np.append(self.elev, mat['phi'][0])
         
         try:
