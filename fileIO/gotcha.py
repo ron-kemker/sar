@@ -180,7 +180,7 @@ class GOTCHA(object):
         mat = loadmat(file_name)['data'][0][0]
         
         azim = mat['th'][0]
-        if not (np.any(azim < maxaz) and np.any(azim > minaz)): 
+        if not (np.any(azim <= maxaz) and np.any(azim >= minaz)): 
             return
         
         if self.cphd is None:
