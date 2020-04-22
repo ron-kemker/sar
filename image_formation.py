@@ -155,7 +155,6 @@ def backProjection(sar_obj, fft_samples=None, n_jobs=1,
     print("") 
     return im_final    
 
-
 def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
                            crop=True):
 
@@ -218,30 +217,24 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
                      dtype=fdtype)
     
     # Range Interpolation
-    range_interp_real = np.zeros((Np, NPHr), fdtype)
-    range_interp_imag = np.zeros((Np, NPHr), fdtype)
+    range_interp = np.zeros((Np, NPHr), cdtype)
     for i in range(Np):
         kx = 4*np.pi*f/c*pos[0,i]/R0[i] 
-        range_interp_real[i] = poly_int(Kx, kx, cphd.real[:,i], n_taps=n_taps)
-        range_interp_imag[i] = poly_int(Kx, kx, cphd.imag[:,i], n_taps=n_taps)
+        range_interp[i] = poly_int(Kx, kx, cphd[:,i], n_taps=n_taps)
  
     # Azimuth Interpolation
-    az_interp_real = np.zeros((NPHa, NPHr), fdtype)
-    az_interp_imag = np.zeros((NPHa, NPHr), fdtype)              
+    az_interp = np.zeros((NPHa, NPHr), cdtype)
     for i in range(NPHr):
         Ky_keystone = Kx[i] * pos[1]/pos[0]
-        az_interp_real[:,i] = poly_int(Ky, Ky_keystone, 
-                                       range_interp_real[:,i], n_taps=n_taps)
-        az_interp_imag[:,i] = poly_int(Ky, Ky_keystone, 
-                                       range_interp_imag[:,i], n_taps=n_taps)        
+        az_interp[:,i] = poly_int(Ky, Ky_keystone, 
+                                       range_interp[:,i], n_taps=n_taps)
  
-    real_polar = np.nan_to_num(az_interp_real)
-    imag_polar = np.nan_to_num(az_interp_imag)    
-    phs_polar = np.nan_to_num(real_polar+1j*imag_polar)
+    phs_polar = np.nan_to_num(az_interp)
     
     # 2-D FFT
     im_final = fftshift(fft2(fftshift(phs_polar)))
     
+    # Trim zero-pad boundary
     if crop:
         centerx = int(NPHa/2)
         centery = int(NPHr/2)
