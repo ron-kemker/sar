@@ -156,7 +156,8 @@ def backProjection(sar_obj, fft_samples=None, n_jobs=1,
     return im_final    
 
 
-def polar_format_algorithm(sar_obj, single_precision=True, upsample=True):
+def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
+                           crop=True):
 
     """Performs polar format algorithm for image-formation
     
@@ -167,8 +168,8 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True):
     # Arguments
         sar_obj: Object. One of the fileIO SAR data readers.
         single_precision: Boolean.  If false, it will be double precision.
-        upsample : Boolean. Should we upsample to the nearest power of 2.
-            
+        upsample: Boolean. Should we upsample to the nearest power of 2.
+        crop: Boolean.  Crop extra zero-padded boundaries.    
     # References
         - Carrera, Goodman, and Majewski (1995).
     """
@@ -240,4 +241,12 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True):
     
     # 2-D FFT
     im_final = fftshift(fft2(fftshift(phs_polar)))
+    
+    if crop:
+        centerx = int(NPHa/2)
+        centery = int(NPHr/2)
+        leftx = centerx - int(Np/2)
+        lefty = centery - int(K/2)
+        im_final = im_final[leftx:leftx+Np, lefty:lefty+K]    
+    
     return cdtype(im_final)
