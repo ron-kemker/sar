@@ -73,7 +73,7 @@ class GOTCHA(object):
 
         # Load model data
         for f in files: 
-            self.readMATFile(f)
+            self.readMATFile(f, minaz, maxaz)
                             
         # If center_frequency and bandwidth defined, override frequency range
         if bandwidth is not None and center_frequency is not None:
@@ -176,8 +176,12 @@ class GOTCHA(object):
             idx = int(mid)
             self.center_loc = np.mean(self.antenna_location[:, idx:idx+2],1)
     
-    def readMATFile(self, file_name):
+    def readMATFile(self, file_name, minaz, maxaz):
         mat = loadmat(file_name)['data'][0][0]
+        
+        azim = mat['th'][0]
+        if not (np.any(azim < maxaz) and np.any(azim > minaz)): 
+            return
         
         if self.cphd is None:
             self.cphd = mat['fp']
