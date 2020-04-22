@@ -63,6 +63,8 @@ class Timer(object):
 # TODO: Implement left/right to match np.interp format        
 def polyphase_interp(x, xp , yp, n_taps=15, n_phases=1000, cutoff=0.9):
     
+    dtype = yp.dtype
+    
     # Compute input and output sample spacing
     dxp = np.diff(xp).min()
     dx = np.diff(x).min()
@@ -96,7 +98,7 @@ def polyphase_interp(x, xp , yp, n_taps=15, n_phases=1000, cutoff=0.9):
     pad_right = max(G[-1] - int(np.ceil(Gp[0] - (n_taps - 1)/2) - G[-1]), 0)
     
     # Calculate output
-    y_pad = np.zeros(x.size + pad_left + pad_right)
+    y_pad = np.zeros(x.size + pad_left + pad_right, dtype=dtype)
     
     for i in range(xp.size):
         V_current = yp[i]
