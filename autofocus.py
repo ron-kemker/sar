@@ -20,7 +20,7 @@ def corr_help(X, Y):
         
     return delta - X.shape[0]/2
     
-def multi_aperture_map_drift_algorithm(range_data, N=2, num_iter=2):
+def multi_aperture_map_drift_algorithm(range_data, N=2, num_iter=6):
     """Performs multi-aperture map-drift algorithm to correct Nth Order Phase
        Errors.
     
@@ -29,6 +29,7 @@ def multi_aperture_map_drift_algorithm(range_data, N=2, num_iter=2):
     # Arguments
         range_data: Complex data. This is the compressed range data from PFA.
         N: integer >=2.  This is the number of subapertures for map-drift.
+        num_iter: integer >=1.  The number of iterations to run MAM
     # References
         - Carrera, Goodman, and Majewski (1995).
     """    
@@ -72,7 +73,7 @@ def multi_aperture_map_drift_algorithm(range_data, N=2, num_iter=2):
         a_vec = np.matmul(delta_inv, np.mean(rel_shift, 1))
         
         # Build new phi value off of computed a_vec
-        phi = 0.0
+        # phi = 0.0
         for i in range(num_pairs):
             phi += a_vec[0] * 2 * t_i[i]
             
