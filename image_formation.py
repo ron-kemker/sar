@@ -158,7 +158,8 @@ def backProjection(sar_obj, fft_samples=None, n_jobs=1,
 def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
                            num_range_samples=None, 
                            num_crossrange_samples=None,
-                           interp_func = poly_int):
+                           interp_func = poly_int,
+                           auto_focus = None):
 
     """Performs polar format algorithm for image-formation
     
@@ -173,6 +174,7 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
         crop: Boolean.  Crop extra zero-padded boundaries.
         num_range_samples: Int > 0. Number of samples in range direction
         num_crossrange_samples: Int > 0. Number of samples in cross-range dir
+        auto_focus: function. A function from autofocus.py
     # References
         - Carrera, Goodman, and Majewski (1995).
     """
@@ -230,7 +232,10 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
     for i in range(Np):
         kx = 4*np.pi*f/c*pos[0,i]/R0[i] 
         range_interp[i] = interp_func(Kx, kx, cphd[:,i])
- 
+
+    if auto_focus:
+        range_interp = auto_focus(range_interp)
+
     # Azimuth Interpolation
     az_interp = np.zeros((NPHa, NPHr), cdtype)
     for i in range(NPHr):
