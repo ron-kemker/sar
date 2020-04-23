@@ -11,11 +11,17 @@ import matplotlib.pyplot as plt
 from scipy.stats import ttest_ind
 import time
 import scipy.signal as sp
-from numpy.fft import fftshift, fft2
+from numpy.fft import fftshift, fft2, fft, ifft
 
 # 2-D FFT Helper function to clean up code
 def ft2(x):
     return fftshift(fft2(fftshift(x)))
+
+def ft(f, ax=-1):
+    return fftshift(fft(fftshift(f), axis = ax))
+        
+def ift(F, ax = -1):
+    return fftshift(ifft(fftshift(F), axis = ax))
 
 # Display log-scaled image
 def imshow(im, dynamic_range=70):
