@@ -22,7 +22,7 @@ with timer as _:
     sar_obj = GOTCHA(data_path,
                 center_frequency=9.6e9, 
                 bandwidth=300e6,
-                # taper_func=taylor_window,
+                taper_func=taylor_window,
                 min_azimuth_angle=40,
                 max_azimuth_angle=42
                 )
@@ -45,3 +45,5 @@ for i in range(len(txt)):
     imshow(image, ax=ax[i])
     ax[i].axis('off')
     ax[i].title.set_text(txt[i])
+
+plt.tight_layout()
