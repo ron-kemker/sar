@@ -9,7 +9,8 @@ Author: Ronald Kemker
 
 import numpy as np
 from warnings import warn
-from utils import ft2
+from utils import ft2, ft, ift
+from scipy.stats import linregress
 
 # Helper function for multi_aperture_map_drift_algorithm
 def corr_help(X, Y):
@@ -20,7 +21,7 @@ def corr_help(X, Y):
         
     return delta - X.shape[0]/2
     
-def multi_aperture_map_drift_algorithm(range_data, N=3, num_iter=6):
+def multi_aperture_map_drift_algorithm(range_data, N=2, num_iter=6):
     """Performs multi-aperture map-drift algorithm to correct Nth Order Phase
        Errors.
     
@@ -94,97 +95,86 @@ def multi_aperture_map_drift_algorithm(range_data, N=3, num_iter=6):
 
     return range_data
 
-def phase_gradient_autofocus(range_data):
+def phase_gradient_autofocus(X, win_params = [100,0.5], 
+                             max_iter = 30, tol = 0.1):    
+    """Performs phase gradient autofocus (PGA) algorithm to correct phase 
+       errors.
     
-    return
+    @author: Ronald Kemker
+
+    # Arguments
+        X: Complex image data. 
+        win_params: list of length 2.  First parameter is window width and 
+                    second is the decay rate (to shrink the window over
+                    iterations.)
+        max_iter: integer >=1.  The number of iterations to run PGA
+        tol: float >= 0.0.  Early termination criterion.  
+    # References
+        - Carrera, Goodman, and Majewski (1995).  Also used code from RITSAR
+        as an example.
+    """    
     
-# def autoFocus(img, win = 'auto', win_params = [100,0.5]):
-# ##############################################################################
-# #                                                                            #
-# #  This program autofocuses an image using the Phase Gradient Algorithm.     #
-# #  If the parameter win is set to auto, an adaptive window is used.          #
-# #  Otherwise, the user sets win to 0 and defines win_params.  The first      #
-# #  element of win_params is the starting windows size.  The second element   #
-# #  is the factor by which to reduce it by for each iteration.  This version  #
-# #  is more suited for an image that is mostly focused.  Below is the paper   #
-# #  this algorithm is based off of.                                           #
-# #                                                                            #
-# #  D. Wahl, P. Eichel, D. Ghiglia, and J. Jakowatz, C.V., \Phase gradient    #
-# #  autofocus-a robust tool for high resolution sar phase correction,"        #
-# #  Aerospace and Electronic Systems, IEEE Transactions on, vol. 30,          #
-# #  pp. 827{835, Jul 1994.                                                    #
-# #                                                                            #
-# ##############################################################################
+    #Derive parameters
+    Np, K = X.shape
     
-#     #Derive parameters
-#     npulses = int(img.shape[0])
-#     nsamples = int(img.shape[1])
+    #Initialize loop variables
+    img_af = np.copy(X)
     
-#     #Initialize loop variables
-#     img_af = 1.0*img
-#     max_iter = 30
-#     af_ph = 0
-#     rms = []
-    
-#     #Compute phase error and apply correction
-#     for iii in range(max_iter):
+    #Compute phase error and apply correction
+    for i in range(max_iter):
         
-#         #Find brightest azimuth sample in each range bin
-#         index = np.argsort(np.abs(img_af), axis=0)[-1]
+        #Find brightest azimuth sample in each range bin
+        index = np.argsort(np.abs(img_af), axis=0)[-1]
         
-#         #Circularly shift image so max values line up   
-#         f = np.zeros(img.shape)+0j
-#         for i in range(nsamples):
-#             f[:,i] = np.roll(img_af[:,i], npulses/2-index[i])
+        #Circularly shift image so max values line up   
+        f = np.zeros(X.shape, X.dtype)
+        for j in range(K):
+            f[:,j] = np.roll(img_af[:,j], int(Np/2-index[j]))
         
-#         if win == 'auto':
-#             #Compute window width    
-#             s = np.sum(f*np.conj(f), axis = -1)
-#             s = 10*np.log10(s/s.max())
-#             width = np.sum(s>-30)
-#             window = np.arange(npulses/2-width/2,npulses/2+width/2)
-#         else:
-#             #Compute window width using win_params if win not set to 'auto'    
-#             width = int(win_params[0]*win_params[1]**iii)
-#             window = np.arange(npulses/2-width/2,npulses/2+width/2)
-#             if width<5:
-#                 break
+        if win_params is None:
+            #Compute window width    
+            s = np.sum(f*np.conj(f), axis = -1)
+            s = 10*np.log10(s/s.max())
+            width = np.sum(s>-30)
+        else:
+            #Compute window width using win_params if win not set to 'auto'    
+            width = int(win_params[0]*win_params[1]**i)
+            if width<5:
+                break
         
-#         #Window image
-#         g = np.zeros(img.shape)+0j
-#         g[window] = f[window]
+        #Window image
+        window = np.int32(np.arange(Np/2-width/2,Np/2+width/2))
+        g = np.zeros(X.shape, X.dtype)
+        g[window] = f[window]
         
-#         #Fourier Transform
-#         G = sig.ift(g, ax=0)
+        #Fourier Transform
+        G = ift(g, 0)
         
-#         #take derivative
-#         G_dot = np.diff(G, axis=0)
-#         a = np.array([G_dot[-1,:]])
-#         G_dot = np.append(G_dot,a,axis = 0)
+        #take derivative
+        G_dot = np.diff(G, axis=0)
+        a = np.array([G_dot[-1,:]])
+        G_dot = np.append(G_dot,a,axis = 0)
         
-#         #Estimate Spectrum for the derivative of the phase error
-#         phi_dot = np.sum((np.conj(G)*G_dot).imag, axis = -1)/\
-#                   np.sum(np.abs(G)**2, axis = -1)
+        #Estimate Spectrum for the derivative of the phase error
+        phi_dot = np.sum((np.conj(G)*G_dot).imag, axis = -1)/\
+                  np.sum(np.abs(G)**2, axis = -1)
+                  
+        #Integrate to obtain estimate of phase error(Jak)
+        phi = np.cumsum(phi_dot)
+        
+        #Remove linear trend
+        t = np.arange(Np)
+        slope, intercept, _, _, _ = linregress(t,phi)
+        line = slope*t+intercept
+        phi = phi-line
+        
+        if np.sqrt(np.mean(phi**2))<tol:
+            break
+        
+        #Apply correction
+        phi2 = np.tile(np.array([phi]).T,(1,K))
+        IMG_af = ift(img_af, ax=0)
+        IMG_af = IMG_af*np.exp(-1j*phi2)
+        img_af = ft(IMG_af, ax=0)
                 
-#         #Integrate to obtain estimate of phase error(Jak)
-#         phi = np.cumsum(phi_dot)
-        
-#         #Remove linear trend
-#         t = np.arange(0,nsamples)
-#         slope, intercept, r_value, p_value, std_err = linregress(t,phi)
-#         line = slope*t+intercept
-#         phi = phi-line
-#         rms.append(np.sqrt(np.mean(phi**2)))
-        
-#         if win == 'auto':
-#             if rms[iii]<0.1:
-#                 break
-        
-#         #Apply correction
-#         phi2 = np.tile(np.array([phi]).T,(1,nsamples))
-#         IMG_af = sig.ift(img_af, ax=0)
-#         IMG_af = IMG_af*np.exp(-1j*phi2)
-#         img_af = sig.ft(IMG_af, ax=0)
-        
-#         #Store phase
-#         af_ph += phi  
+    return img_af
