@@ -45,17 +45,20 @@ def multi_aperture_map_drift_algorithm(range_data, N=2, num_iter=6):
     range_mask = np.zeros((K, ), dtype=np.bool)
     range_mask[np.unique(idx)] = True
     phi = 0
-    
+
     for _ in range(num_iter):
         
         range_bins = np.sum(range_mask)
-        data = range_data * np.exp(1j * phi)
+        
+        if range_bins < 1:
+            break
+        
         map_arr = []
         
         ti_pix = np.int32(t_i + Ta/2)
         h = int(Ta/(2*N))
         for i in range(N):
-            map_arr += [np.abs(ft2(data[ti_pix[i]-h:ti_pix[i]+h]))]
+            map_arr += [np.abs(ft2(range_data[ti_pix[i]-h:ti_pix[i]+h]))]
         
         num_pairs = int(N*(N-1)/2)
         rel_shift = np.zeros((num_pairs, range_bins ) , dtype=np.float32)
@@ -73,19 +76,19 @@ def multi_aperture_map_drift_algorithm(range_data, N=2, num_iter=6):
         a_vec = np.matmul(delta_inv, np.mean(rel_shift, 1))
         
         # Build new phi value off of computed a_vec
-        # phi = 0.0
+        phi = 0.0
         for i in range(num_pairs):
             phi += a_vec[0] * 2 * t_i[i]
             
         # Discard range bins 1 std away from mean
         mean_err = np.mean(rel_shift, 1)
-        one_std_from_mean = np.std(rel_shift, 1)/2.0
+        one_std_from_mean = np.std(rel_shift, 1)#/2.0
         mean_range_err = np.mean(rel_shift, 0)
         range_mask_idx = np.argwhere(range_mask)
         less_than = mean_range_err < mean_err - one_std_from_mean
         greater_than = mean_range_err > mean_err + one_std_from_mean
         discard = less_than + greater_than
         range_mask[range_mask_idx[discard]] = False
-        
-               
-    return range_data * np.exp(1j * phi)
+        range_data = range_data * np.exp(1j * phi)
+
+    return range_data
