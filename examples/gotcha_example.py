@@ -40,9 +40,15 @@ with timer as _:
 plt.subplot(2,1,1)
 imshow(image.T)
 
-timer = Timer("Multi-Aperture Map-Drift")
+timer = Timer("PFA w/ Multi-Aperture Map-Drift")
 with timer as _:
-    image_mam = MAM(image)
+    image_mam = PFA(sar_obj, 
+            upsample=False, 
+            interp_func = np.interp,
+            auto_focus = MAM,
+            # num_range_samples=128,
+            # num_crossrange_samples=256
+            )
 
 plt.subplot(2,1,2)
 imshow(image_mam.T)
