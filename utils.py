@@ -24,13 +24,16 @@ def ift(F, ax = -1):
     return fftshift(ifft(fftshift(F), axis = ax))
 
 # Display log-scaled image
-def imshow(im, dynamic_range=70):
+def imshow(im, dynamic_range=70, ax=None):
         
     img = np.abs(im)/np.max(np.abs(im))
     img = 20.0 * np.log10(img)
     img[img > 0] = 0.0
     img[img < -dynamic_range] = -dynamic_range
-    plt.imshow(img, cmap='gray')
+    if ax:
+        ax.imshow(img, cmap='gray')
+    else:
+        plt.imshow(img, cmap='gray')
     
 # Return magnitide-only image from complex-valued image
 def getAmplitudeOnly(img):
