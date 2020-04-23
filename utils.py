@@ -11,17 +11,20 @@ import matplotlib.pyplot as plt
 from scipy.stats import ttest_ind
 import time
 import scipy.signal as sp
+from numpy.fft import fftshift, fft2
+
+# 2-D FFT Helper function to clean up code
+def ft2(x):
+    return fftshift(fft2(fftshift(x)))
 
 # Display log-scaled image
 def imshow(im, dynamic_range=70):
         
-    plt.figure(1, figsize=[10,10])
     img = np.abs(im)/np.max(np.abs(im))
     img = 20.0 * np.log10(img)
     img[img > 0] = 0.0
     img[img < -dynamic_range] = -dynamic_range
     plt.imshow(img, cmap='gray')
-    
     
 # Return magnitide-only image from complex-valued image
 def getAmplitudeOnly(img):
