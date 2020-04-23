@@ -11,7 +11,6 @@ from multiprocessing import Pool
 from numpy.fft import ifft, fftshift
 import numpy as np
 from utils import polyphase_interp as poly_int
-from autofocus import  multi_aperture_map_drift_algorithm as MAM
 from utils import ft2
 
 # This processes a single pulse (broken out for parallelization)
@@ -157,7 +156,6 @@ def backProjection(sar_obj, fft_samples=None, n_jobs=1,
     return im_final    
 
 def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
-                           map_drift=True,
                            num_range_samples=None, 
                            num_crossrange_samples=None,
                            interp_func = poly_int):
@@ -173,7 +171,6 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
         single_precision: Boolean.  If false, it will be double precision.
         upsample: Boolean. Should we upsample to the nearest power of 2.
         crop: Boolean.  Crop extra zero-padded boundaries.
-        map_drift: Boolean.  Run map-drift algorithm after range interp.
         num_range_samples: Int > 0. Number of samples in range direction
         num_crossrange_samples: Int > 0. Number of samples in cross-range dir
     # References
@@ -233,9 +230,6 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
     for i in range(Np):
         kx = 4*np.pi*f/c*pos[0,i]/R0[i] 
         range_interp[i] = interp_func(Kx, kx, cphd[:,i])
-
-    if map_drift:
-        range_interp = MAM(range_interp)
  
     # Azimuth Interpolation
     az_interp = np.zeros((NPHa, NPHr), cdtype)
@@ -256,5 +250,5 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
         leftx = centerx - int(Np/2)
         lefty = centery - int(K/2)
         im_final = im_final[leftx:leftx+Np, lefty:lefty+K]    
-    
+ 
     return cdtype(im_final)
