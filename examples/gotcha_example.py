@@ -12,6 +12,7 @@ from utils import imshow, Timer, polyphase_interp
 from signal_processing import taylor_window
 import numpy as np
 import matplotlib.pyplot as plt
+from autofocus import multi_aperture_map_drift_algorithm as MAM
 
 data_path ='..\..\data\GOTCHA\DATA\pass8\HH'
 
@@ -30,7 +31,6 @@ plt.figure(1, figsize=[10,10])
 timer = Timer("PFA")
 with timer as _:
     image = PFA(sar_obj, 
-                map_drift=False, 
                 upsample=False, 
                 interp_func = np.interp,
                 # num_range_samples=128,
@@ -40,16 +40,10 @@ with timer as _:
 plt.subplot(2,1,1)
 imshow(image.T)
 
-timer = Timer("PFA w/ Multi-Aperture Map-Drift")
+timer = Timer("Multi-Aperture Map-Drift")
 with timer as _:
-    image = PFA(sar_obj, 
-                map_drift=True, 
-                upsample=False, 
-                interp_func = np.interp,
-                # num_range_samples=128,
-                # num_crossrange_samples=256
-                )
+    image_mam = MAM(image)
 
 plt.subplot(2,1,2)
-imshow(image.T)
+imshow(image_mam.T)
 
