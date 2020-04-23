@@ -8,10 +8,11 @@ Author: Ronald Kemker
 '''
 
 from multiprocessing import Pool
-from numpy.fft import ifft, fftshift, fft2
+from numpy.fft import ifft, fftshift
 import numpy as np
 from utils import polyphase_interp as poly_int
-
+from autofocus import  multi_aperture_map_drift_algorithm as MAM
+from utils import ft2
 
 # This processes a single pulse (broken out for parallelization)
 def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim, 
@@ -156,7 +157,10 @@ def backProjection(sar_obj, fft_samples=None, n_jobs=1,
     return im_final    
 
 def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
-                           crop=True):
+                           map_drift=True,
+                           num_range_samples=None, 
+                           num_crossrange_samples=None,
+                           interp_func = poly_int):
 
     """Performs polar format algorithm for image-formation
     
@@ -168,7 +172,10 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
         sar_obj: Object. One of the fileIO SAR data readers.
         single_precision: Boolean.  If false, it will be double precision.
         upsample: Boolean. Should we upsample to the nearest power of 2.
-        crop: Boolean.  Crop extra zero-padded boundaries.    
+        crop: Boolean.  Crop extra zero-padded boundaries.
+        map_drift: Boolean.  Run map-drift algorithm after range interp.
+        num_range_samples: Int > 0. Number of samples in range direction
+        num_crossrange_samples: Int > 0. Number of samples in cross-range dir
     # References
         - Carrera, Goodman, and Majewski (1995).
     """
@@ -182,7 +189,6 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
         
     #Retrieve relevent parameters
     c           =   299792458.0
-    n_taps      =   101
     Np          =   sar_obj.num_pulses
     K           =   sar_obj.num_samples
     pos         =   sar_obj.antenna_location
@@ -193,9 +199,15 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
     if upsample:
         NPHr= 2**int(np.log2(K)+bool(np.mod(np.log2(K),1)))
         NPHa= 2**int(np.log2(Np)+bool(np.mod(np.log2(Np),1)))
+        crop = True
+    elif num_range_samples and num_crossrange_samples:
+        NPHr = num_range_samples
+        NPHa = num_crossrange_samples
+        crop = False
     else:
         NPHr = K
         NPHa = Np  
+        crop = False
     
     # Computer other useful variables
     center_pulse = int(Np/2)
@@ -220,19 +232,22 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
     range_interp = np.zeros((Np, NPHr), cdtype)
     for i in range(Np):
         kx = 4*np.pi*f/c*pos[0,i]/R0[i] 
-        range_interp[i] = poly_int(Kx, kx, cphd[:,i], n_taps=n_taps)
+        range_interp[i] = interp_func(Kx, kx, cphd[:,i])
+
+    if map_drift:
+        range_interp = MAM(range_interp)
  
     # Azimuth Interpolation
     az_interp = np.zeros((NPHa, NPHr), cdtype)
     for i in range(NPHr):
         Ky_keystone = Kx[i] * pos[1]/pos[0]
-        az_interp[:,i] = poly_int(Ky, Ky_keystone, 
-                                       range_interp[:,i], n_taps=n_taps)
+        az_interp[:,i] = interp_func(Ky, Ky_keystone, 
+                                       range_interp[:,i])
  
     phs_polar = np.nan_to_num(az_interp)
     
     # 2-D FFT
-    im_final = fftshift(fft2(fftshift(phs_polar)))
+    im_final = ft2(phs_polar)
     
     # Trim zero-pad boundary
     if crop:
