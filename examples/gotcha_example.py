@@ -53,9 +53,7 @@ for i in range(len(txt)):
         timer = Timer('PFA w/ Spatially Variant Autofocus')
         with timer as _:
             image_af = SVA(image)
-        imshow(image.T, ax=ax[1,1])
+        imshow(image_af.T, ax=ax[1,1])
         ax[1,1].axis('off')
         ax[1,1].title.set_text('PFA w/ Spatially Variant Autofocus')
-
-# plt.tight_layout()
 
