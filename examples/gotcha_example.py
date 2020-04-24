@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from autofocus import multi_aperture_map_drift_algorithm as MAM
 from autofocus import phase_gradient_autofocus as PGA
-from autofocus import spatial_variant_autofocus2 as SVA
+from autofocus import spatial_variant_autofocus as SVA
 
 data_path ='..\..\data\GOTCHA\DATA\pass1\VV'
 
@@ -28,7 +28,7 @@ with timer as _:
                 max_azimuth_angle=-46,
                 )
 
-fig, ax = plt.subplots(1, 3, figsize=[12,10])
+fig, ax = plt.subplots(2,2, figsize=[8,8])
 txt = ['PFA',"PFA w/ Multi-Aperture Map-Drift",
         "PFA w/ Phase Gradient Autofocus"]
 af = [None, MAM, PGA]
@@ -43,10 +43,19 @@ for i in range(len(txt)):
                     auto_focus = af[i],
                     single_precision=False,
                     )
+    r = i // 2
+    c = i % 2
+    imshow(image.T, ax=ax[c,r])
+    ax[c,r].axis('off')
+    ax[c,r].title.set_text(txt[i])
 
-    imshow(image.T, ax=ax[i])
-    ax[i].axis('off')
-    ax[i].title.set_text(txt[i])
+    if i == 0:
+        timer = Timer('PFA w/ Spatially Variant Autofocus')
+        with timer as _:
+            image_af = SVA(image)
+        imshow(image.T, ax=ax[1,1])
+        ax[1,1].axis('off')
+        ax[1,1].title.set_text('PFA w/ Spatially Variant Autofocus')
 
-plt.tight_layout()
+# plt.tight_layout()
 
