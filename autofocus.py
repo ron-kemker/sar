@@ -293,8 +293,8 @@ def spatial_variant_autofocus2(X, N=1):
     
     idx_r = w_u.real > 0.5
     idx_i = w_u.imag > 0.5
-    X1.real[idx_r] = X.real[idx_r]+sum_r[idx_r]*w_u.real[idx_r]
-    X1.imag[idx_i] = (X.imag[idx_i]+sum_i[idx_i]*w_u.imag[idx_i])            
+    X1.real[idx_r] = X.real[idx_r]+sum_r[idx_r]*0.5
+    X1.imag[idx_i] = X.imag[idx_i]+sum_i[idx_i]*0.5            
     det1 = X1 * np.conj(X1)
 
     # Vertical Apodization
@@ -312,8 +312,8 @@ def spatial_variant_autofocus2(X, N=1):
     
     idx_r = w_u.real > 0.5
     idx_i = w_u.imag > 0.5
-    X2.real[idx_r] = X2.real[idx_r]+sum_r[idx_r]*w_u.real[idx_r]
-    X2.imag[idx_i] = (X2.imag[idx_i]+sum_i[idx_i]*w_u.imag[idx_i])            
+    X2.real[idx_r] = X2.real[idx_r]+sum_r[idx_r]*0.5
+    X2.imag[idx_i] = X2.imag[idx_i]+sum_i[idx_i]*0.5         
     det2 = X2 * np.conj(X2)
     
     X2 = np.rot90(X2, 3)
