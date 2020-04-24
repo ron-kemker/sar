@@ -271,6 +271,7 @@ def spatial_variant_autofocus2(X, N=1):
     ----------
         - Carrera, Goodman, and Majewski (1995), Appendix D
     '''
+    X1 = np.copy(X)
     X2 = np.rot90(X)
 
     filt = np.zeros((1, 2*N + 1), np.float32)
@@ -323,5 +324,4 @@ def spatial_variant_autofocus2(X, N=1):
     idx = det1 < det2
     output[idx] = X1[idx]
     output[~idx] = X2[~idx]
-    
     return output
