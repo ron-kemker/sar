@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from autofocus import multi_aperture_map_drift_algorithm as MAM
 from autofocus import phase_gradient_autofocus as PGA
-from autofocus import spatial_variant_autofocus as SVA
+from autofocus import spatial_variant_autofocus2 as SVA
 
 data_path ='..\..\data\GOTCHA\DATA\pass1\VV'
 
