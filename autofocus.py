@@ -98,7 +98,7 @@ def multi_aperture_map_drift_algorithm(range_data, N=2, num_iter=6):
     return range_data
 
 def phase_gradient_autofocus(X, win_params = [100,0.5], 
-                             max_iter = 30, tol = 0.1):    
+                             max_iter = 30, range_subset=50):    
     """Performs phase gradient autofocus (PGA) algorithm to correct phase 
        errors.
     
@@ -110,7 +110,7 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
                     second is the decay rate (to shrink the window over
                     iterations.)
         max_iter: integer >=1.  The number of iterations to run PGA
-        tol: float >= 0.0.  Early termination criterion.  
+        range_subset: int > 1.  The number of range bins to begin analysis 
     # References
         - Carrera, Goodman, and Majewski (1995).  Also used code from RITSAR
         as an example.
@@ -121,17 +121,20 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
     
     #Initialize loop variables
     img_af = np.copy(X)
-    
+
     #Compute phase error and apply correction
     for i in range(max_iter):
         
+        range_idx = np.argsort(np.sum(np.abs(img_af), 0))[-range_subset:]
+        
         #Find brightest azimuth sample in each range bin
-        index = np.argsort(np.abs(img_af), axis=0)[-1]
+        az_fft = ft(img_af[:, range_idx], 0)
+        index = np.argsort(np.abs(az_fft), axis=0)[-1]
         
         #Circularly shift image so max values line up   
-        f = np.zeros(X.shape, X.dtype)
-        for j in range(K):
-            f[:,j] = np.roll(img_af[:,j], int(Np/2-index[j]))
+        f = np.zeros(az_fft.shape, az_fft.dtype)
+        for j in range(az_fft.shape[1]):
+            f[:,j] = np.roll(az_fft[:,j], int(Np/2-index[j]))
         
         if win_params is None:
             #Compute window width    
@@ -146,19 +149,20 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
         
         #Window image
         window = np.int32(np.arange(Np/2-width/2,Np/2+width/2))
-        g = np.zeros(X.shape, X.dtype)
+        g = np.zeros(az_fft.shape, az_fft.dtype)
         g[window] = f[window]
+        
+        #take derivative
+        g_dot = np.diff(g, axis=0)
+        g_dot = np.append(g_dot, np.zeros((1, range_subset)), axis=0)
+        G_dot = ft(g_dot, 0)
         
         #Fourier Transform
         G = ift(g, 0)
-        
-        #take derivative
-        G_dot = np.diff(G, axis=0)
-        a = np.array([G_dot[-1,:]])
-        G_dot = np.append(G_dot,a,axis = 0)
+        G_conj = np.conjugate(G)
         
         #Estimate Spectrum for the derivative of the phase error
-        phi_dot = np.sum((np.conj(G)*G_dot).imag, axis = -1)/\
+        phi_dot = np.sum((G_dot * G_conj).imag, axis = -1)/\
                   np.sum(np.abs(G)**2, axis = -1)
                   
         #Integrate to obtain estimate of phase error(Jak)
@@ -169,10 +173,7 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
         slope, intercept, _, _, _ = linregress(t,phi)
         line = slope*t+intercept
         phi = phi-line
-        
-        if np.sqrt(np.mean(phi**2))<tol:
-            break
-        
+                
         #Apply correction
         phi2 = np.tile(np.array([phi]).T,(1,K))
         IMG_af = ift(img_af, ax=0)
