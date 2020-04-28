@@ -9,12 +9,11 @@ Author: Ronald Kemker
 from fileIO.gotcha import GOTCHA
 from image_formation import polar_format_algorithm as PFA
 from utils import imshow, Timer, polyphase_interp
-from signal_processing import taylor_window
+from signal_processing import spatial_variant_apodization2 as SVA
 import numpy as np
 import matplotlib.pyplot as plt
 from autofocus import multi_aperture_map_drift_algorithm as MAM
 from autofocus import phase_gradient_autofocus as PGA
-from autofocus import spatial_variant_autofocus2 as SVA
 
 data_path ='..\..\data\GOTCHA\DATA\pass1\HH'
 
@@ -23,37 +22,33 @@ with timer as _:
     sar_obj = GOTCHA(data_path,
                 center_frequency=9.6e9, 
                 bandwidth=650e6,
-                taper_func=taylor_window,
                 min_azimuth_angle=-50,
                 max_azimuth_angle=-46,
                 )
+fig, ax = plt.subplots(1,3, figsize=[8,12])
 
-fig, ax = plt.subplots(2,2, figsize=[8,8])
-txt = ['PFA',"PFA w/ Multi-Aperture Map-Drift",
-        "PFA w/ Phase Gradient Autofocus"]
-af = [None, MAM, PGA]
+timer = Timer('Polar Format Algorithm')
+with timer as _:
+    image = PFA(sar_obj, 
+            upsample=True, 
+            interp_func = np.interp,
+            single_precision=True,
+            )    
+    imshow(image.T, ax=ax[0])
+    ax[0].axis('off')
+    ax[0].title.set_text('Polar Format Algorithm')
 
-for i in range(len(txt)):
+timer = Timer('Spatially Variant Apodization')
+with timer as _:
+    image_sva = SVA(image)
+    imshow(image_sva.T, ax=ax[1])
+    ax[1].axis('off')
+    ax[1].title.set_text('Spatially Variant Apodization')
 
-    timer = Timer(txt[i])
-    with timer as _:
-        image = PFA(sar_obj, 
-                    upsample=True, 
-                    interp_func = np.interp,
-                    auto_focus = af[i],
-                    single_precision=True,
-                    )
-    r = i // 2
-    c = i % 2
-    imshow(image.T, ax=ax[c,r])
-    ax[c,r].axis('off')
-    ax[c,r].title.set_text(txt[i])
-
-    if i == 0:
-        timer = Timer('Spatially Variant Autofocus')
-        with timer as _:
-            image_af = SVA(image)
-        imshow(image_af.T, ax=ax[1,1])
-        ax[1,1].axis('off')
-        ax[1,1].title.set_text('PFA w/ Spatially Variant Autofocus')
+timer = Timer('Phase Gradient Autofocus')
+with timer as _:
+    image_af = PGA(image_sva)
+    imshow(image_af.T, ax=ax[2])
+    ax[2].axis('off')
+    ax[2].title.set_text('Phase Gradient Autofocus')
 
