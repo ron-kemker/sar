@@ -201,7 +201,7 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
     if upsample:
         NPHr= 2**int(np.log2(K)+bool(np.mod(np.log2(K),1))) // Nr
         NPHa= 2**int(np.log2(Np)+bool(np.mod(np.log2(Np),1))) // Nc
-        crop = True
+        crop = False
     elif num_range_samples and num_crossrange_samples:
         NPHr = num_range_samples
         NPHa = num_crossrange_samples
