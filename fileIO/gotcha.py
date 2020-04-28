@@ -10,8 +10,6 @@ from scipy.io import loadmat
 import numpy as np
 import warnings
 from glob import glob
-from utils import ft, ift
-from scipy.stats import linregress
 
 class GOTCHA(object):
     """Processes the AFRL GOTCHA Data
@@ -32,8 +30,6 @@ class GOTCHA(object):
         bandwidth: Numeric > 0.  Bandwidth to process (in Hz)
         center_freq: Numeric > 0.  Center frequency to process (in Hz)
         single_precision: Boolean.  If false, it will be double precision.
-        RVP_correction: Boolean.  If true, perform residual video phase
-                        compensation (see Carrera Appendix C)
     
     # References
         - [GOTCHA Volumetric SAR Dataset Overview](
@@ -165,17 +161,7 @@ class GOTCHA(object):
         self.range_pixels = int(self.range_extent / dr)
         self.cross_range_pixels = int(self.cross_range_extent / dx )
         self.polarization = pol
-        
-        # Perform Residual Video Phase Correction
-        if RVP_correction:
-            delta_t = 1 / self.bandwidth
-            t = np.linspace(-K/2, K/2, K)
-            gamma,_,_,_,_ = linregress(t*delta_t, AntFreq)
-            f_t = np.linspace(-K/2, K/2, K)*2*gamma/c*self.delta_r
-            S_c = np.exp(-1j*np.pi*f_t**2/gamma)
-            S_c = np.tile(S_c[np.newaxis], [Np, 1])
-            self.cphd = ift(ft(self.cphd)*S_c)
-            
+                    
         mid = Np / 2
         if mid > 0:
             self.center_loc = self.antenna_location[:, int(mid)]
