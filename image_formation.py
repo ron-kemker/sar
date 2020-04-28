@@ -159,7 +159,8 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
                            num_range_samples=None, 
                            num_crossrange_samples=None,
                            interp_func = poly_int,
-                           auto_focus = None):
+                           range_compression=1,
+                           crossrange_compression = 1):
 
     """Performs polar format algorithm for image-formation
     
@@ -174,7 +175,6 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
         crop: Boolean.  Crop extra zero-padded boundaries.
         num_range_samples: Int > 0. Number of samples in range direction
         num_crossrange_samples: Int > 0. Number of samples in cross-range dir
-        auto_focus: function. A function from autofocus.py
     # References
         - Carrera, Goodman, and Majewski (1995).
     """
@@ -193,19 +193,22 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
     pos         =   sar_obj.antenna_location
     cphd        =   sar_obj.cphd
     f           =   sar_obj.freq
+    
+    Nr = range_compression
+    Nc = crossrange_compression
 
     #Define image plane parameters
     if upsample:
-        NPHr= 2**int(np.log2(K)+bool(np.mod(np.log2(K),1)))
-        NPHa= 2**int(np.log2(Np)+bool(np.mod(np.log2(Np),1)))
+        NPHr= 2**int(np.log2(K)+bool(np.mod(np.log2(K),1))) // Nr
+        NPHa= 2**int(np.log2(Np)+bool(np.mod(np.log2(Np),1))) // Nc
         crop = True
     elif num_range_samples and num_crossrange_samples:
         NPHr = num_range_samples
         NPHa = num_crossrange_samples
         crop = False
     else:
-        NPHr = K
-        NPHa = Np  
+        NPHr = K // Nr
+        NPHa = Np  // Np
         crop = False
     
     # Computer other useful variables
@@ -231,10 +234,7 @@ def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
     range_interp = np.zeros((Np, NPHr), cdtype)
     for i in range(Np):
         kx = 4*np.pi*f/c*pos[0,i]/R0[i] 
-        range_interp[i] = interp_func(Kx, kx, cphd[:,i])
-
-    if auto_focus:
-        range_interp = auto_focus(range_interp)
+        range_interp[i] = interp_func(Kx, kx, cphd[i])
 
     # Azimuth Interpolation
     az_interp = np.zeros((NPHa, NPHr), cdtype)
