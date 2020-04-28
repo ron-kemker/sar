@@ -29,7 +29,7 @@ def ift2(x):
 # Display log-scaled image
 def imshow(im, dynamic_range=70, ax=None):
         
-    img = np.abs(im)/np.max(np.abs(im))
+    img = np.abs(im+1e-6)/np.max(np.abs(im))
     img = 20.0 * np.log10(img)
     img[img > 0] = 0.0
     img[img < -dynamic_range] = -dynamic_range
