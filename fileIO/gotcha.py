@@ -9,8 +9,9 @@ Author: Ronald Kemker
 from scipy.io import loadmat
 import numpy as np
 import warnings
-from signal_processing import hamming_window
 from glob import glob
+from utils import ft, ift
+from scipy.stats import linregress
 
 class GOTCHA(object):
     """Processes the AFRL GOTCHA Data
@@ -30,8 +31,9 @@ class GOTCHA(object):
         max_frequency: Numeric > 0. Maximum frequency (in Hz)
         bandwidth: Numeric > 0.  Bandwidth to process (in Hz)
         center_freq: Numeric > 0.  Center frequency to process (in Hz)
-        taper_func: func. Side-lobe reduction func from singal_processing.py
         single_precision: Boolean.  If false, it will be double precision.
+        RVP_correction: Boolean.  If true, perform residual video phase
+                        compensation (see Carrera Appendix C)
     
     # References
         - [GOTCHA Volumetric SAR Dataset Overview](
@@ -41,8 +43,8 @@ class GOTCHA(object):
                  max_azimuth_angle=180, 
                  min_frequency = 0, max_frequency=20e9,
                  bandwidth=None, center_frequency=None,
-                 taper_func = hamming_window, 
-                 verbose = True, single_precision=True):
+                 verbose = True, single_precision=True,
+                 RVP_correction=True):
         
         pol = data_path.split('\\')[-1].lower()
         minaz = min_azimuth_angle
@@ -86,8 +88,8 @@ class GOTCHA(object):
         freq_idx = np.logical_and(self.freq >= minfreq, self.freq <= maxfreq)
         
         # Complex phase history data
-        self.cphd = cdtype(self.cphd[freq_idx][:, az_idx])
-        [K, Np] = self.cphd.shape
+        self.cphd = cdtype(self.cphd[freq_idx][:, az_idx]).T
+        [Np, K] = self.cphd.shape
         
         # Grab the true collection geometries stored in the data
         AntAzim = self.azim[az_idx]
@@ -102,11 +104,7 @@ class GOTCHA(object):
         center_freq = (AntFreq[-1] + AntFreq[0])/2.0
         minF = np.min(AntFreq)
         deltaF = AntFreq[1] - AntFreq[0] # Pulse-Bandwidth
-               
-        # Apply a 2-D hamming window to CPHD for side-lobe suppression
-        if taper_func is not None:
-            self.cphd = cdtype(taper_func(self.cphd))
-                
+                               
         # Determine the azimuth angles of the image pulses (in radians)
         AntAz = AntAzim*np.pi/180.0
         AntElev = AntElev*np.pi/180.0
@@ -167,7 +165,17 @@ class GOTCHA(object):
         self.range_pixels = int(self.range_extent / dr)
         self.cross_range_pixels = int(self.cross_range_extent / dx )
         self.polarization = pol
-                
+        
+        # Perform Residual Video Phase Correction
+        if RVP_correction:
+            delta_t = 1 / self.bandwidth
+            t = np.linspace(-K/2, K/2, K)
+            gamma,_,_,_,_ = linregress(t*delta_t, AntFreq)
+            f_t = np.linspace(-K/2, K/2, K)*2*gamma/c*self.delta_r
+            S_c = np.exp(-1j*np.pi*f_t**2/gamma)
+            S_c = np.tile(S_c[np.newaxis], [Np, 1])
+            self.cphd = ift(ft(self.cphd)*S_c)
+            
         mid = Np / 2
         if mid > 0:
             self.center_loc = self.antenna_location[:, int(mid)]
