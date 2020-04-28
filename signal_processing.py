@@ -8,6 +8,8 @@ Author: Ronald Kemker
 
 import numpy as np
 from scipy.signal import convolve2d as conv2d
+from utils import ft, ift
+from scipy.stats import linregress
 
 # This applies a Hamming window to the CPHD file (side-lobe suppression)
 def hamming_window(cphd):
@@ -76,16 +78,15 @@ def taylor(N, sidelobe, n_bar=None):
     w = w/w.max()          
     return w
 
-def spatial_variant_apodization(X, N=2):
+def spatial_variant_apodization(X, N=1):
     '''
-    This runs the spatial variant apodization algorithm 
-    This matches a version shared by a co-worker.  
+    This runs the spatial variant apodization algorithm. 
 
     Parameters
     ----------
     X : complex-valued, numeric.  This is the input image.
     N : integer >=1.  This is the sampling frequency.
-        DESCRIPTION. The default is 2.
+        DESCRIPTION. The default is 1.
 
     Returns
     -------
@@ -93,78 +94,8 @@ def spatial_variant_apodization(X, N=2):
     
     References
     ----------
-        - Carrera, Goodman, and Majewski (1995), Appendix D
-    '''
-    # Define functions to clean up space    
-    min2D = np.minimum
-    max2D = np.maximum
-    
-    X2 = np.rot90(X)
-
-    filt = np.zeros((1, 2*N + 1), np.float32)
-    filt[0,0] = 1
-    filt[0,-1] = 1
-
-    # Horizontal Apodization
-    sum_r = conv2d(X.real, filt, mode='same')
-    sum_i = conv2d(X.imag, filt, mode='same')
-    
-    weights = np.zeros(sum_r.shape, X.dtype)
-    idx = sum_r != 0
-    weights.real[idx] = min2D(max2D(-X.real[idx]/sum_r[idx], 
-                                    0.0), 0.5)
-    idx = sum_i != 0
-    weights.imag[idx] = min2D(max2D(-X.imag[idx]/sum_i[idx], 
-                                    0.0), 0.5)
-    
-    X1 = X.real+sum_r*weights.real + (X.imag+sum_i*weights.imag) * 1j 
-             
-    det1 = X1 * np.conj(X1)
-
-    # Vertical Apodization
-    sum_r = conv2d(X2.real, filt, mode='same')
-    sum_i = conv2d(X2.imag, filt, mode='same')
-    
-    weights = np.zeros(sum_r.shape, X.dtype)
-    idx = sum_r != 0
-    weights.real[idx] = min2D(max2D(-X2.real[idx]/sum_r[idx], 
-                                    0.0), 0.5)
-    idx = sum_i != 0
-    weights.imag[idx] = min2D(max2D(-X2.imag[idx]/sum_i[idx], 
-                                    0.0), 0.5)
-    
-    X2 = X2.real+sum_r*weights.real + (X2.imag+sum_i*weights.imag) * 1j 
-             
-    det2 = X2 * np.conj(X2)
-    
-    X2 = np.rot90(X2, 3)
-    det2 = np.rot90(det2, 3)
-    
-    output = np.zeros(X1.shape, X1.dtype)
-    idx = det1 < det2
-    output[idx] = X1[idx]
-    output[~idx] = X2[~idx]
-    
-    return output
-
-def spatial_variant_apodization2(X, N=1):
-    '''
-    This runs the spatial variant apodization algorithm 
-    This is more similar to the book implementation.
-
-    Parameters
-    ----------
-    X : complex-valued, numeric.  This is the input image.
-    N : integer >=1.  This is the sampling frequency.
-        DESCRIPTION. The default is 2.
-
-    Returns
-    -------
-    output : numeric.  This is the output image.
-    
-    References
-    ----------
-        - Carrera, Goodman, and Majewski (1995), Appendix D
+    Stankwitz, Dallaire, and Fienup (1995).  "Nonlinear Apodization for 
+    Sidelobe Control in SAR Imagery."  
     '''
     X1 = np.copy(X)
     X2 = np.rot90(X)
@@ -181,16 +112,13 @@ def spatial_variant_apodization2(X, N=1):
     w_u.real = -X.real/sum_r
     w_u.imag = -X.imag/sum_i
     
-    X1 = np.copy(X)
-    idx_r = np.logical_and(w_u.real >= 0.0, w_u.real<= 0.5) 
-    idx_i = np.logical_and(w_u.imag >= 0.0, w_u.imag<= 0.5)
-    X1.real[idx_r] = 0.0
-    X1.imag[idx_i] = 0.0
+    w_u.real[w_u.real < 0] = 0.0
+    w_u.real[w_u.real > 0.5] = 0.5
+    w_u.imag[w_u.imag < 0] = 0.0
+    w_u.imag[w_u.imag > 0.5] = 0.5
     
-    idx_r = w_u.real > 0.5
-    idx_i = w_u.imag > 0.5
-    X1.real[idx_r] = X.real[idx_r]+sum_r[idx_r]*0.5
-    X1.imag[idx_i] = X.imag[idx_i]+sum_i[idx_i]*0.5            
+    X1.real = X.real + w_u.real * sum_r
+    X1.imag = X.imag + w_u.imag * sum_i           
     det1 = X1 * np.conj(X1)
 
     # Vertical Apodization
@@ -201,15 +129,13 @@ def spatial_variant_apodization2(X, N=1):
     w_u.real = -X2.real/sum_r
     w_u.imag = -X2.imag/sum_i
     
-    idx_r = np.logical_and(w_u.real >= 0.0, w_u.real<= 0.5) 
-    idx_i = np.logical_and(w_u.imag >= 0.0, w_u.imag<= 0.5)
-    X2.real[idx_r] = 0.0
-    X2.imag[idx_i] = 0.0 
+    w_u.real[w_u.real < 0] = 0.0
+    w_u.real[w_u.real > 0.5] = 0.5
+    w_u.imag[w_u.imag < 0] = 0.0
+    w_u.imag[w_u.imag > 0.5] = 0.5
     
-    idx_r = w_u.real > 0.5
-    idx_i = w_u.imag > 0.5
-    X2.real[idx_r] = X2.real[idx_r]+sum_r[idx_r]*0.5
-    X2.imag[idx_i] = X2.imag[idx_i]+sum_i[idx_i]*0.5         
+    X2.real = X2.real + w_u.real * sum_r
+    X2.imag = X2.imag + w_u.imag * sum_i           
     det2 = X2 * np.conj(X2)
     
     X2 = np.rot90(X2, 3)
@@ -220,3 +146,33 @@ def spatial_variant_apodization2(X, N=1):
     output[idx] = X1[idx]
     output[~idx] = X2[~idx]
     return output
+
+def residual_video_phase_compensation(cphd, frequency):
+    '''
+    This performs RVP Compensation.
+
+    Parameters
+    ----------
+    cphd : TYPE
+        The complex phase history data to be compensated.
+    frequency : numpy array of floats
+        The frequency range of the input cphd.
+
+    Returns
+    -------
+    output : same datatype as cphd
+        This is the RVP compensated phase history data.
+
+    '''    
+    c = 299792458 # Speed of Light
+    bandwidth = np.max(frequency) - np.min(frequency)
+    delta_r = c/(2.0*bandwidth)                                       
+    
+    [Np, K] = cphd.shape
+    delta_t = 1 / bandwidth
+    t = np.linspace(-K/2, K/2, K)
+    gamma,_,_,_,_ = linregress(t*delta_t, frequency)
+    f_t = np.linspace(-K/2, K/2, K)*2*gamma/c*delta_r
+    S_c = np.exp(-1j*np.pi*f_t**2/gamma)
+    S_c = np.tile(S_c[np.newaxis], [Np, 1])
+    return ift(ft(cphd)*S_c)
