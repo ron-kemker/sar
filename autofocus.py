@@ -9,10 +9,9 @@ Author: Ronald Kemker
 
 import numpy as np
 from warnings import warn
-from utils import ft2, ft, ift, ift2
+from utils import ft2, ft, ift
 from scipy.stats import linregress
-from scipy.signal import convolve2d as conv2d
-from numpy.fft import fftshift, fft2, ifft2
+# from numpy.fft import fftshift, fft2, ifft2
 
 # Helper function for multi_aperture_map_drift_algorithm
 def corr_help(X, Y):
@@ -98,7 +97,7 @@ def multi_aperture_map_drift_algorithm(range_data, N=2, num_iter=6):
     return range_data
 
 def phase_gradient_autofocus(X, win_params = [100,0.5], 
-                             max_iter = 30, range_subset=50):    
+                             max_iter = 30, range_subset=None):    
     """Performs phase gradient autofocus (PGA) algorithm to correct phase 
        errors.
     
@@ -122,13 +121,18 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
     #Initialize loop variables
     img_af = np.copy(X)
 
+    if not range_subset:
+        range_subset = K
+
     #Compute phase error and apply correction
     for i in range(max_iter):
         
+        # Azimuth FFT (for range subset only)
         range_idx = np.argsort(np.sum(np.abs(img_af), 0))[-range_subset:]
-        
+        # az_fft = ft(img_af[:, range_idx], 0)
+        az_fft = img_af[:, range_idx]
+
         #Find brightest azimuth sample in each range bin
-        az_fft = ft(img_af[:, range_idx], 0)
         index = np.argsort(np.abs(az_fft), axis=0)[-1]
         
         #Circularly shift image so max values line up   
@@ -138,7 +142,7 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
         
         if win_params is None:
             #Compute window width    
-            s = np.sum(f*np.conj(f), axis = -1)
+            s = np.sum(np.abs(f)**2, axis = -1)
             s = 10*np.log10(s/s.max())
             width = np.sum(s>-30)
         else:
@@ -153,12 +157,9 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
         g[window] = f[window]
         
         #take derivative
-        g_dot = np.diff(g, axis=0)
-        g_dot = np.append(g_dot, np.zeros((1, range_subset)), axis=0)
-        G_dot = ft(g_dot, 0)
-        
-        #Fourier Transform
         G = ift(g, 0)
+        G_dot = np.diff(G, axis=0)
+        G_dot = np.append(G_dot, G_dot[-1][np.newaxis], axis=0)
         G_conj = np.conjugate(G)
         
         #Estimate Spectrum for the derivative of the phase error
@@ -170,159 +171,14 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
         
         #Remove linear trend
         t = np.arange(Np)
-        slope, intercept, _, _, _ = linregress(t,phi)
-        line = slope*t+intercept
+        slope, bias, _, _, _ = linregress(t,phi)
+        line = slope*t+bias
         phi = phi-line
                 
         #Apply correction
-        phi2 = np.tile(np.array([phi]).T,(1,K))
-        IMG_af = ift(img_af, ax=0)
+        phi2 = np.tile(phi[:,np.newaxis],(1,K))
+        IMG_af = ift(img_af, 0)
         IMG_af = IMG_af*np.exp(-1j*phi2)
-        img_af = ft(IMG_af, ax=0)
+        img_af = ft(IMG_af, 0)
                 
     return img_af
-
-def spatial_variant_autofocus(X, N=2):
-    '''
-    This runs the spatial variant autofocus algorithm (post image formation).
-    This matches a version shared by a co-worker.  
-
-    Parameters
-    ----------
-    X : complex-valued, numeric.  This is the input image.
-    N : integer >=1.  This is the sampling frequency.
-        DESCRIPTION. The default is 2.
-
-    Returns
-    -------
-    output : numeric.  This is the output image.
-    
-    References
-    ----------
-        - Carrera, Goodman, and Majewski (1995), Appendix D
-    '''
-    # Define functions to clean up space    
-    min2D = np.minimum
-    max2D = np.maximum
-    
-    X2 = np.rot90(X)
-
-    filt = np.zeros((1, 2*N + 1), np.float32)
-    filt[0,0] = 1
-    filt[0,-1] = 1
-
-    # Horizontal Apodization
-    sum_r = conv2d(X.real, filt, mode='same')
-    sum_i = conv2d(X.imag, filt, mode='same')
-    
-    weights = np.zeros(sum_r.shape, X.dtype)
-    idx = sum_r != 0
-    weights.real[idx] = min2D(max2D(-X.real[idx]/sum_r[idx], 
-                                    0.0), 0.5)
-    idx = sum_i != 0
-    weights.imag[idx] = min2D(max2D(-X.imag[idx]/sum_i[idx], 
-                                    0.0), 0.5)
-    
-    X1 = X.real+sum_r*weights.real + (X.imag+sum_i*weights.imag) * 1j 
-             
-    det1 = X1 * np.conj(X1)
-
-    # Vertical Apodization
-    sum_r = conv2d(X2.real, filt, mode='same')
-    sum_i = conv2d(X2.imag, filt, mode='same')
-    
-    weights = np.zeros(sum_r.shape, X.dtype)
-    idx = sum_r != 0
-    weights.real[idx] = min2D(max2D(-X2.real[idx]/sum_r[idx], 
-                                    0.0), 0.5)
-    idx = sum_i != 0
-    weights.imag[idx] = min2D(max2D(-X2.imag[idx]/sum_i[idx], 
-                                    0.0), 0.5)
-    
-    X2 = X2.real+sum_r*weights.real + (X2.imag+sum_i*weights.imag) * 1j 
-             
-    det2 = X2 * np.conj(X2)
-    
-    X2 = np.rot90(X2, 3)
-    det2 = np.rot90(det2, 3)
-    
-    output = np.zeros(X1.shape, X1.dtype)
-    idx = det1 < det2
-    output[idx] = X1[idx]
-    output[~idx] = X2[~idx]
-    
-    return output
-
-def spatial_variant_autofocus2(X, N=1):
-    '''
-    This runs the spatial variant autofocus algorithm (post image formation).
-    This is more similar to the book implementation.
-
-    Parameters
-    ----------
-    X : complex-valued, numeric.  This is the input image.
-    N : integer >=1.  This is the sampling frequency.
-        DESCRIPTION. The default is 2.
-
-    Returns
-    -------
-    output : numeric.  This is the output image.
-    
-    References
-    ----------
-        - Carrera, Goodman, and Majewski (1995), Appendix D
-    '''
-    X1 = np.copy(X)
-    X2 = np.rot90(X)
-
-    filt = np.zeros((1, 2*N + 1), np.float32)
-    filt[0,0] = 1
-    filt[0,-1] = 1
-
-    # Horizontal Apodization
-    sum_r = conv2d(X.real, filt, mode='same')
-    sum_i = conv2d(X.imag, filt, mode='same')
-    
-    w_u = np.zeros(sum_r.shape, X.dtype)
-    w_u.real = -X.real/sum_r
-    w_u.imag = -X.imag/sum_i
-    
-    X1 = np.copy(X)
-    idx_r = np.logical_and(w_u.real >= 0.0, w_u.real<= 0.5) 
-    idx_i = np.logical_and(w_u.imag >= 0.0, w_u.imag<= 0.5)
-    X1.real[idx_r] = 0.0
-    X1.imag[idx_i] = 0.0
-    
-    idx_r = w_u.real > 0.5
-    idx_i = w_u.imag > 0.5
-    X1.real[idx_r] = X.real[idx_r]+sum_r[idx_r]*0.5
-    X1.imag[idx_i] = X.imag[idx_i]+sum_i[idx_i]*0.5            
-    det1 = X1 * np.conj(X1)
-
-    # Vertical Apodization
-    sum_r = conv2d(X2.real, filt, mode='same')
-    sum_i = conv2d(X2.imag, filt, mode='same')
-    
-    w_u = np.zeros(sum_r.shape, X.dtype)
-    w_u.real = -X2.real/sum_r
-    w_u.imag = -X2.imag/sum_i
-    
-    idx_r = np.logical_and(w_u.real >= 0.0, w_u.real<= 0.5) 
-    idx_i = np.logical_and(w_u.imag >= 0.0, w_u.imag<= 0.5)
-    X2.real[idx_r] = 0.0
-    X2.imag[idx_i] = 0.0 
-    
-    idx_r = w_u.real > 0.5
-    idx_i = w_u.imag > 0.5
-    X2.real[idx_r] = X2.real[idx_r]+sum_r[idx_r]*0.5
-    X2.imag[idx_i] = X2.imag[idx_i]+sum_i[idx_i]*0.5         
-    det2 = X2 * np.conj(X2)
-    
-    X2 = np.rot90(X2, 3)
-    det2 = np.rot90(det2, 3)
-    
-    output = np.zeros(X1.shape, X1.dtype)
-    idx = det1 < det2
-    output[idx] = X1[idx]
-    output[~idx] = X2[~idx]
-    return output
