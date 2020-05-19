@@ -40,7 +40,7 @@ class GOTCHA(object):
                  min_frequency = 0, max_frequency=20e9,
                  bandwidth=None, center_frequency=None,
                  verbose = True, single_precision=True,
-                 RVP_correction=True):
+                 mcp = [0, 0, 0]):
         
         pol = data_path.split('\\')[-1].lower()
         minaz = min_azimuth_angle
@@ -156,19 +156,12 @@ class GOTCHA(object):
         self.bandwidth = (f2-f1)*1e9
         self.delta_r = fdtype(c/(2.0*self.bandwidth))
         self.r0 = AntR0
-        self.range_extent = maxWr
-        self.cross_range_extent = maxWx
-        self.range_pixels = int(self.range_extent / dr)
-        self.cross_range_pixels = int(self.cross_range_extent / dx )
         self.polarization = pol
-                    
-        mid = Np / 2
-        if mid > 0:
-            self.center_loc = self.antenna_location[:, int(mid)]
-        else:
-            idx = int(mid)
-            self.center_loc = np.mean(self.antenna_location[:, idx:idx+2],1)
-    
+        self.f_0 = (AntFreq[0] + AntFreq[-1])/2
+        self.k_r = 4*np.pi*AntFreq/c
+        self.n_hat = np.array([ 0, 0 , 1]  , dtype=fdtype)
+        # TODO: Allow motion re-compensation 
+                        
     def readMATFile(self, file_name, minaz, maxaz):
         mat = loadmat(file_name)['data'][0][0]
         
@@ -211,7 +204,5 @@ class GOTCHA(object):
         except ValueError:
             self.ph_correct = None
     
-    # Return Complex Phase History Data
-    def getCPHD(self):
-        return self.cphd
+
     
