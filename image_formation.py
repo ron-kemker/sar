@@ -10,8 +10,10 @@ Author: Ronald Kemker
 from multiprocessing import Pool
 from numpy.fft import ifft, fftshift
 import numpy as np
-from utils import polyphase_interp as poly_int
+from signal_processing import polyphase_interp as poly_int
 from utils import ft2
+from numpy.linalg import norm
+from signal_processing import taylor
 
 # This processes a single pulse (broken out for parallelization)
 def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim, 
@@ -155,105 +157,117 @@ def backProjection(sar_obj, fft_samples=None, n_jobs=1,
     print("") 
     return im_final    
 
-def polar_format_algorithm(sar_obj, single_precision=True, upsample=True,
-                           num_range_samples=None, 
-                           num_crossrange_samples=None,
-                           interp_func = poly_int,
-                           range_compression=1,
-                           crossrange_compression = 1):
-
+def polar_format_algorithm(sar_obj, single_precision=True,
+                            interp_func = poly_int, upsample=True,
+                            taylor_weighting=0):
     """Performs polar format algorithm for image-formation
     
     @author: Ronald Kemker
 
-    See examples/basic_example.py for example.
+    See examples/sandia_example.py for example.
 
     # Arguments
-        sar_obj: Object. One of the fileIO SAR data readers.
-        single_precision: Boolean.  If false, it will be double precision.
-        upsample: Boolean. Should we upsample to the nearest power of 2.
-        crop: Boolean.  Crop extra zero-padded boundaries.
-        num_range_samples: Int > 0. Number of samples in range direction
-        num_crossrange_samples: Int > 0. Number of samples in cross-range dir
+                 sar_obj: Object. 
+                          One of the fileIO SAR data readers.
+        single_precision: Boolean.  Default=True  
+                          If false, it will be double precision.
+             interp_func: Function.  Default=polyphase_interpolation
+                          The type of interpolation used for polar formatting
+                upsample: Boolean. 
+                          Upsample to the nearest power of 2.
+        taylor_weighting: Numeric.  Default=0 (No Taylor Weighting)
+                          Taylor weighting factor (in dB) for sidelobe 
+                          mitigation 
+
     # References
         - Carrera, Goodman, and Majewski (1995).
-    """
-    
+    """    
+    #Retrieve relevent parameters
+    pi          =   np.pi
+    c           =   299792458.0
+    K           =   sar_obj.num_samples
+    Np          =   sar_obj.num_pulses
+    f_0         =   sar_obj.f_0
+    pos         =   sar_obj.antenna_location.T
+    k           =   sar_obj.k_r
+    n_hat       =   sar_obj.n_hat
+    cphd        =   sar_obj.cphd
+    delta_r     =   sar_obj.delta_r
+
+    # Precision of the output data
     if single_precision:
         fdtype = np.float32
         cdtype = np.complex64
     else:
         fdtype = np.float64
         cdtype = np.complex128
-        
-    #Retrieve relevent parameters
-    c           =   299792458.0
-    Np          =   sar_obj.num_pulses
-    K           =   sar_obj.num_samples
-    pos         =   sar_obj.antenna_location
-    cphd        =   sar_obj.cphd
-    f           =   sar_obj.freq
-    
-    Nr = range_compression
-    Nc = crossrange_compression
 
-    #Define image plane parameters
-    if upsample:
-        NPHr= 2**int(np.log2(K)+bool(np.mod(np.log2(K),1))) // Nr
-        NPHa= 2**int(np.log2(Np)+bool(np.mod(np.log2(Np),1))) // Nc
-        crop = False
-    elif num_range_samples and num_crossrange_samples:
-        NPHr = num_range_samples
-        NPHa = num_crossrange_samples
-        crop = False
+    # Find the center pulse
+    if np.mod(Np,2)>0:
+        R_c = pos[int(Np/2)]
     else:
-        NPHr = K // Nr
-        NPHa = Np  // Np
-        crop = False
-    
-    # Computer other useful variables
-    center_pulse = int(Np/2)
-    R0 = np.sqrt(np.sum(pos**2, 0))
-    
-    # Rotate the XY-plane
-    theta = np.arctan2(pos[1, center_pulse], pos[0, center_pulse])
-    A = np.array([np.cos(theta), np.sin(theta), -np.sin(theta), 
-                  np.cos(theta)]).reshape(2,2)
-    pos[0:2] = np.matmul(A , pos[0:2])
-    
-    # Define the ouput Keystone
-    kx = 4*np.pi*f/c*pos[0,0]/R0[0]
-    ky= 4*np.pi*f/c*pos[1,0]/R0[0]
-    kx_min = np.min(kx)
-    kx = 4*np.pi*f/c * pos[0,center_pulse]/R0[center_pulse]
-    Kx = np.linspace(kx_min, np.max(kx), NPHr, dtype=fdtype)
-    Ky = np.linspace(-np.max(np.abs(ky)), np.max(np.abs(ky)), NPHa, 
-                     dtype=fdtype)
-    
-    # Range Interpolation
-    range_interp = np.zeros((Np, NPHr), cdtype)
-    for i in range(Np):
-        kx = 4*np.pi*f/c*pos[0,i]/R0[i] 
-        range_interp[i] = interp_func(Kx, kx, cphd[i])
+        R_c = np.mean(pos[int(Np/2-1):int(Np/2+1)], axis = 0)
 
+    # Define the shape of the output image
+    if upsample:
+        nu = 2**int(np.log2(K)+bool(np.mod(np.log2(K),1)))
+        nv = 2**int(np.log2(Np)+bool(np.mod(np.log2(Np),1)))
+    else:
+        nu = K
+        nv = Np
+
+    #Define resolution.  This should be less than the system resolution limits
+    du = delta_r*K/nu
+    dv = du # TODO: Could consider custom aspect ratios
+            
+    #Derive image plane spatial frequencies
+    k_ui = 2*pi*np.linspace(-1.0/(2*du), 1.0/(2*du), nu)
+    k_vi = 2*pi*np.linspace(-1.0/(2*dv), 1.0/(2*dv), nv)
+
+    #Compute k_xi offset
+    psi = pi/2-np.arccos(np.dot(R_c,n_hat)/norm(R_c))
+    k_ui = k_ui + 4*pi*f_0/c*np.cos(psi)
+        
+    #Compute x and y unit vectors. x defined to lie along R_c.
+    u_hat = (R_c-np.dot(R_c,n_hat)*n_hat)/norm((R_c-np.dot(R_c,n_hat)*n_hat))
+    v_hat = np.cross(u_hat,n_hat)
+    
+    #Compute r_hat, the diretion of k_r, for each pulse
+    r_hat = (pos.T/norm(pos,axis=1)).T
+        
+    #Compute kx and ky meshgrid
+    k_matrix = np.tile(k,(Np,1))
+    ku = np.matmul(r_hat,u_hat.T)[:,np.newaxis] * k_matrix
+    kv = np.matmul(r_hat,v_hat.T)[:,np.newaxis] * k_matrix
+    
+    # Taylor Weighting (none is default)
+    win1 = taylor(cphd.shape[1], taylor_weighting)
+    win2 = taylor(cphd.shape[0], taylor_weighting)
+
+    #Radially interpolate (i.e. range) kx and ky data from polar raster
+    #onto evenly spaced kx_i and ky_i grid for each pulse
+    rad_interp = np.zeros([Np,nu], dtype=cdtype)
+    ky_new = np.zeros([Np,nu], dtype=fdtype)
+    for i in range(Np):
+        rad_interp.real[i,:] = interp_func(k_ui, ku[i,:], 
+            cphd.real[i,:]*win1, left=0, right=0)
+        rad_interp.imag[i,:] = interp_func(k_ui, ku[i,:], 
+            cphd.imag[i,:]*win1, left=0, right=0)
+        ky_new[i,:] = np.interp(k_ui, ku[i,:], kv[i,:])  
+    
+    #Interpolate in along track direction to obtain polar formatted data
+    polar_interp = np.zeros([nv,nu], dtype=cdtype)
+    
+    # Force ky_new vertices to be in ascending order to match k_vi
+    if (ky_new[Np//2, nu//2] > ky_new[Np//2+1, nu//2]):
+        ky_new = ky_new[::-1]
+        rad_interp = rad_interp[::-1]
+    
     # Azimuth Interpolation
-    az_interp = np.zeros((NPHa, NPHr), cdtype)
-    for i in range(NPHr):
-        Ky_keystone = Kx[i] * pos[1]/pos[0]
-        az_interp[:,i] = interp_func(Ky, Ky_keystone, 
-                                       range_interp[:,i])
- 
-    phs_polar = np.nan_to_num(az_interp)
-    
-    # 2-D FFT
-    im_final = ft2(phs_polar)
-    
-    # Trim zero-pad boundary
-    if crop:
-        centerx = int(NPHa/2)
-        centery = int(NPHr/2)
-        leftx = centerx - int(Np/2)
-        lefty = centery - int(K/2)
-        im_final = im_final[leftx:leftx+Np, lefty:lefty+K]    
- 
-    return cdtype(im_final)
+    for i in range(nu):
+        polar_interp.real[:,i] = interp_func(k_vi, ky_new[:,i], 
+            rad_interp.real[:,i]*win2, left=0, right=0)
+        polar_interp.imag[:,i] = interp_func(k_vi, ky_new[:,i], 
+            rad_interp.imag[:,i]*win2, left=0, right=0)
+
+    return ft2(np.nan_to_num(polar_interp))  
