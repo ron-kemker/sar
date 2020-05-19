@@ -120,6 +120,7 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
     
     #Initialize loop variables
     img_af = np.copy(X)
+    ph_err = []
 
     if not range_subset:
         range_subset = K
@@ -174,6 +175,7 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
         slope, bias, _, _, _ = linregress(t,phi)
         line = slope*t+bias
         phi = phi-line
+        ph_err += [phi]
                 
         #Apply correction
         phi2 = np.tile(phi[:,np.newaxis],(1,K))
@@ -181,4 +183,4 @@ def phase_gradient_autofocus(X, win_params = [100,0.5],
         IMG_af = IMG_af*np.exp(-1j*phi2)
         img_af = ft(IMG_af, 0)
                 
-    return img_af
+    return img_af, ph_err
