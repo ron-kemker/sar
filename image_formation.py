@@ -37,7 +37,7 @@ def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim,
     # Update the image using linear interpolation
     return interp_func(dR[idx], r_vec, rc) * phCorr[idx], idx
 
-def backProjection(sar_obj, fft_samples=None, n_jobs=1, 
+def back_projection(sar_obj, fft_samples=None, n_jobs=1, 
                    single_precision=True, 
                    num_x_samples=501, num_y_samples=501, 
                    scene_extent_x=None, scene_extent_y=None, 
@@ -133,7 +133,7 @@ def backProjection(sar_obj, fft_samples=None, n_jobs=1,
     if n_jobs > 1:
         args = []
         for ii in range(Np):
-            args += [(cphd[:,ii], Nfft, x_mat, y_mat, 
+            args += [(cphd[ii], Nfft, x_mat, y_mat, 
                      z_mat, el[ii], az[ii], phCorr_exp, 
                      min_rvec, max_rvec, r_vec)]
 
@@ -149,7 +149,7 @@ def backProjection(sar_obj, fft_samples=None, n_jobs=1,
         print("")
         for ii in range(Np):
             print('\rProcessing: %1.1f%%' % (ii/Np *100.0), end="") 
-            [img, idx] = bp_helper(cphd[:,ii], Nfft, x_mat, 
+            [img, idx] = bp_helper(cphd[ii], Nfft, x_mat, 
                     y_mat, z_mat, el[ii], az[ii],  
                     phCorr_exp, min_rvec, max_rvec, r_vec)
             im_final[idx] = im_final[idx] + img
