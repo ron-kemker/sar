@@ -10,6 +10,7 @@ import numpy as np
 from scipy.signal import convolve2d as conv2d
 from utils import ft, ift
 from scipy.stats import linregress
+import scipy.signal as sp
 
 # This applies a Hamming window to the CPHD file (side-lobe suppression)
 def hamming_window(cphd):
@@ -63,9 +64,7 @@ def taylor(N, sidelobe, n_bar=None):
         num = 1
         den = 1
         for j in n:
-            num = num*\
-            (-1)**(i+1)*(1-i**2*1.0/sigma_p/(\
-                            A**2+(j-0.5)**2))
+            num = num*(-1)**(i+1)*(1-i**2*1.0/sigma_p/(A**2+(j-0.5)**2))
             if i!=j:
                 den = den*(1-i**2*1.0/j**2)
             
@@ -147,32 +146,102 @@ def spatial_variant_apodization(X, N=1):
     output[~idx] = X2[~idx]
     return output
 
-def residual_video_phase_compensation(cphd, frequency):
+def residual_video_phase_compensation(cphd, frequency, gamma=None, 
+                                      delta_r=None):
     '''
     This performs RVP Compensation.
 
     Parameters
     ----------
-    cphd : TYPE
+    cphd : complex-valued 2-D numpy array
         The complex phase history data to be compensated.
     frequency : numpy array of floats
         The frequency range of the input cphd.
-
+    gamma : float
+        The chirprate in Hz
     Returns
     -------
     output : same datatype as cphd
         This is the RVP compensated phase history data.
 
     '''    
-    c = 299792458 # Speed of Light
-    bandwidth = np.max(frequency) - np.min(frequency)
-    delta_r = c/(2.0*bandwidth)                                       
-    
+    c = 3e8 #299792458 # Speed of Light
     [Np, K] = cphd.shape
-    delta_t = 1 / bandwidth
+
+    bandwidth = np.max(frequency) - np.min(frequency)
+    
+    if delta_r is None:
+        delta_r = c/(2.0*bandwidth)  
+                                     
     t = np.linspace(-K/2, K/2, K)
-    gamma,_,_,_,_ = linregress(t*delta_t, frequency)
-    f_t = np.linspace(-K/2, K/2, K)*2*gamma/c*delta_r
+    
+    if gamma is None:
+        delta_t = 1 / bandwidth
+        gamma,_,_,_,_ = linregress(t*delta_t, frequency)
+    
+    f_t = t*2*gamma/c*delta_r
     S_c = np.exp(-1j*np.pi*f_t**2/gamma)
-    S_c = np.tile(S_c[np.newaxis], [Np, 1])
+    S_c = np.tile(S_c, [Np, 1])
     return ift(ft(cphd)*S_c)
+
+# Polyphase interpolation as described in "Spotlight Synthetic Aperture Radar"
+# written by Carrara, Goodman, and Majewski
+# Code written by Doug MacDonald
+def polyphase_interp (x, xp, yp, n_taps=15, n_phases=10000, cutoff = 0.95,
+                      left=None, right=None):
+        
+    # Compute input and output sample spacing
+    dxp = np.diff(xp).min()
+    dx = np.diff(x).min()
+    
+    # Assume uniformly spaced input
+    if dx > (1.001*np.diff(x)).max() or dx < (0.999*np.diff(x)).min():
+            raise ValueError('Output sample spacing not uniform')
+    
+    # Input centered convolution - scale output sample spacing to 1
+    offset = x.min()
+    G = ((x-offset)/dx).astype(int)
+    Gp = ((xp-offset)/dx)
+    
+    # Create prototype polyphase filter
+    if not n_taps%2:
+        raise ValueError('Filter should have odd number of taps')
+    
+    if dx > dxp:                    # Downsampling
+        f_cutoff = cutoff           # Align filter nulls with output which has a sample spacing of 1 by definition
+    else:                           # Upsampling
+        f_cutoff = cutoff * dx/dxp  # Align filter nulls with input which has a normalized sample spacing of dxp/dx
+    
+    filt_proto = sp.firwin(n_taps, f_cutoff, fs=2)
+    
+    # Create polyphase filter
+    filt_poly = sp.resample(filt_proto, n_taps*n_phases)
+    mid_point = (n_taps-1)/2
+    # Pad input for convolution
+    pad_left = max(G[0] - int(np.floor(Gp[0] - mid_point)), 0)
+    pad_right = max(int(np.ceil(Gp[-1] + mid_point)) - G[-1], 0)
+    
+    # Calculate output
+    y_pad = np.zeros(x.size + pad_left + pad_right)
+    
+    for i in range(xp.size):
+        V_current = yp[i]
+        G_current = Gp[i] + pad_left
+        G_left = G_current - mid_point
+        G_start = int(np.ceil(G_left))
+        G_right = G_current + mid_point
+        G_end = int(np.floor(G_right))
+        
+        # Input samples may not be evenly spaced so comput a local scale factor
+        if i < xp.size - 1:
+            local_scale = Gp[i+1] - Gp[i]
+        
+        filt = filt_poly[int((G_start-G_left)*n_phases): \
+                         int((G_end-G_left)*n_phases)+1:n_phases]*local_scale
+        y_pad[G_start:G_end+1] += V_current*filt
+      
+    if pad_right > 0:
+        return y_pad[pad_left:-pad_right]
+    else:
+        return y_pad[pad_left:]
+    
