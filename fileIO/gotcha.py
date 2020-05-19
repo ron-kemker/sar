@@ -160,6 +160,8 @@ class GOTCHA(object):
         self.f_0 = (AntFreq[0] + AntFreq[-1])/2
         self.k_r = 4*np.pi*AntFreq/c
         self.n_hat = np.array([ 0, 0 , 1]  , dtype=fdtype)
+        self.range_extent = maxWr
+        self.cross_range_extent =maxWx
         # TODO: Allow motion re-compensation 
                         
     def readMATFile(self, file_name, minaz, maxaz):
