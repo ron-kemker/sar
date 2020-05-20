@@ -32,6 +32,7 @@ timer = Timer('Polar Format Algorithm')
 with timer as _:
     image = PFA(sar_obj, 
             single_precision=True,
+            n_jobs=8,
             )
 
     imshow(image, ax=ax[0], dynamic_range=45)
