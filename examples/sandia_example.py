@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 File: sandia_example.py
-Description: Example script for GOTCHA datasets. 
+Description: Example script for the Sandia dataset. 
 Author: Ronald Kemker
 
 '''
