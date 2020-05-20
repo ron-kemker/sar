@@ -167,4 +167,5 @@ class SANDIA(object):
         self.delta_r = delta_r
         self.chirprate = chirprate
         self.bandwidth = B_IF
+        self.f_0 = f_0
         
