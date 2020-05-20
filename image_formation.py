@@ -14,6 +14,7 @@ from signal_processing import polyphase_interp as poly_int
 from utils import ft2
 from numpy.linalg import norm
 from signal_processing import taylor
+import scipy.signal as sp
 
 # This processes a single pulse (broken out for parallelization)
 def bp_helper(ph_data, Nfft, x_mat, y_mat, z_mat, AntElev, AntAzim, 
@@ -159,7 +160,7 @@ def back_projection(sar_obj, fft_samples=None, n_jobs=1,
 
 def polar_format_algorithm(sar_obj, single_precision=True,
                             interp_func = poly_int, upsample=True,
-                            taylor_weighting=0):
+                            taylor_weighting=0, n_jobs=1):
     """Performs polar format algorithm for image-formation
     
     @author: Ronald Kemker
@@ -178,7 +179,8 @@ def polar_format_algorithm(sar_obj, single_precision=True,
         taylor_weighting: Numeric.  Default=0 (No Taylor Weighting)
                           Taylor weighting factor (in dB) for sidelobe 
                           mitigation 
-
+                  n_cpus: Integer.  Default=1 
+                          Number of CPUs used for interpolation operations
     # References
         - Carrera, Goodman, and Majewski (1995).
     """    
@@ -193,7 +195,7 @@ def polar_format_algorithm(sar_obj, single_precision=True,
     n_hat       =   sar_obj.n_hat
     cphd        =   sar_obj.cphd
     delta_r     =   sar_obj.delta_r
-
+    
     # Precision of the output data
     if single_precision:
         fdtype = np.float32
@@ -248,12 +250,31 @@ def polar_format_algorithm(sar_obj, single_precision=True,
     #onto evenly spaced kx_i and ky_i grid for each pulse
     rad_interp = np.zeros([Np,nu], dtype=cdtype)
     ky_new = np.zeros([Np,nu], dtype=fdtype)
-    for i in range(Np):
-        rad_interp.real[i,:] = interp_func(k_ui, ku[i,:], 
-            cphd.real[i,:]*win1, left=0, right=0)
-        rad_interp.imag[i,:] = interp_func(k_ui, ku[i,:], 
-            cphd.imag[i,:]*win1, left=0, right=0)
-        ky_new[i,:] = np.interp(k_ui, ku[i,:], kv[i,:])  
+    
+    # Parallel Processing for Range Interpolation
+    if n_jobs > 1:
+        args = []
+        for ii in range(Np):
+            args += [(k_ui, ku[ii,:], cphd.real[ii,:]*win1,0,0)]
+        for ii in range(Np):
+            args += [(k_ui, ku[ii,:], cphd.imag[ii,:]*win1,0,0)]
+            
+        with Pool(processes=n_jobs) as pool:
+            results = pool.starmap(interp_func, args)
+                        
+        for ii in range(Np):
+            rad_interp.real[ii,:] = results[ii]
+            rad_interp.imag[ii,:] = results[Np+ii]
+            ky_new[ii,:] = np.interp(k_ui, ku[ii,:], kv[ii,:]) 
+            
+    # Single Job Range Interpolation
+    else:
+        for i in range(Np):
+            rad_interp.real[i,:] = interp_func(k_ui, ku[i,:], 
+                cphd.real[i,:]*win1, left=0, right=0)
+            rad_interp.imag[i,:] = interp_func(k_ui, ku[i,:], 
+                cphd.imag[i,:]*win1, left=0, right=0)
+            ky_new[i,:] = np.interp(k_ui, ku[i,:], kv[i,:])  
     
     #Interpolate in along track direction to obtain polar formatted data
     polar_interp = np.zeros([nv,nu], dtype=cdtype)
@@ -263,11 +284,27 @@ def polar_format_algorithm(sar_obj, single_precision=True,
         ky_new = ky_new[::-1]
         rad_interp = rad_interp[::-1]
     
-    # Azimuth Interpolation
-    for i in range(nu):
-        polar_interp.real[:,i] = interp_func(k_vi, ky_new[:,i], 
-            rad_interp.real[:,i]*win2, left=0, right=0)
-        polar_interp.imag[:,i] = interp_func(k_vi, ky_new[:,i], 
-            rad_interp.imag[:,i]*win2, left=0, right=0)
+    # Parallel Processing for Azimuth Interpolation
+    if n_jobs > 1:
+        args = []
+        for ii in range(nu):
+            args += [(k_vi, ky_new[:,ii], rad_interp.real[:,ii]*win2,0,0)]
+        for ii in range(nu):
+            args += [(k_vi, ky_new[:,ii], rad_interp.imag[:,ii]*win2,0,0)]
+            
+        with Pool(processes=n_jobs) as pool:
+            results = pool.starmap(interp_func, args)
+                        
+        for ii in range(nu):
+            polar_interp.real[:,ii] = results[ii]
+            polar_interp.imag[:,ii] = results[nu+ii]
+    
+    # Singe Job Azimuth Interpolation
+    else:
+        for i in range(nu):
+            polar_interp.real[:,i] = interp_func(k_vi, ky_new[:,i], 
+                rad_interp.real[:,i]*win2, left=0, right=0)
+            polar_interp.imag[:,i] = interp_func(k_vi, ky_new[:,i], 
+                rad_interp.imag[:,i]*win2, left=0, right=0)
 
     return ft2(np.nan_to_num(polar_interp))  
