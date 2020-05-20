@@ -165,7 +165,7 @@ def residual_video_phase_compensation(cphd, frequency, gamma=None,
         This is the RVP compensated phase history data.
 
     '''    
-    c = 3e8 #299792458 # Speed of Light
+    c = 299792458 # Speed of Light
     [Np, K] = cphd.shape
 
     bandwidth = np.max(frequency) - np.min(frequency)
@@ -187,8 +187,8 @@ def residual_video_phase_compensation(cphd, frequency, gamma=None,
 # Polyphase interpolation as described in "Spotlight Synthetic Aperture Radar"
 # written by Carrara, Goodman, and Majewski
 # Code written by Doug MacDonald
-def polyphase_interp (x, xp, yp, n_taps=15, n_phases=10000, cutoff = 0.95,
-                      left=None, right=None):
+def polyphase_interp (x, xp, yp, left=None, right=None,n_taps=15, 
+                      n_phases=10000, cutoff = 0.95):
         
     # Compute input and output sample spacing
     dxp = np.diff(xp).min()
@@ -210,12 +210,11 @@ def polyphase_interp (x, xp, yp, n_taps=15, n_phases=10000, cutoff = 0.95,
     if dx > dxp:                    # Downsampling
         f_cutoff = cutoff           # Align filter nulls with output which has a sample spacing of 1 by definition
     else:                           # Upsampling
-        f_cutoff = cutoff * dx/dxp  # Align filter nulls with input which has a normalized sample spacing of dxp/dx
+        f_cutoff = cutoff * dx/dxp  # Align filter nulls with input which has a normalized sample spacing of dxp/dx    
     
     filt_proto = sp.firwin(n_taps, f_cutoff, fs=2)
-    
-    # Create polyphase filter
     filt_poly = sp.resample(filt_proto, n_taps*n_phases)
+    
     mid_point = (n_taps-1)/2
     # Pad input for convolution
     pad_left = max(G[0] - int(np.floor(Gp[0] - mid_point)), 0)
@@ -244,4 +243,3 @@ def polyphase_interp (x, xp, yp, n_taps=15, n_phases=10000, cutoff = 0.95,
         return y_pad[pad_left:-pad_right]
     else:
         return y_pad[pad_left:]
-    
