@@ -6,7 +6,6 @@ Author: Ronald Kemker
 
 '''
 
-import numpy as np
 from fileIO.gotcha import GOTCHA
 from image_formation import polar_format_algorithm as PFA
 from utils import imshow, Timer
