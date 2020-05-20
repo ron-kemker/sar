@@ -11,6 +11,7 @@ from scipy.signal import convolve2d as conv2d
 from utils import ft, ift
 from scipy.stats import linregress
 import scipy.signal as sp
+from numpy.linalg import norm
 
 # This applies a Hamming window to the CPHD file (side-lobe suppression)
 def hamming_window(cphd):
@@ -243,3 +244,20 @@ def polyphase_interp (x, xp, yp, left=None, right=None,n_taps=15,
         return y_pad[pad_left:-pad_right]
     else:
         return y_pad[pad_left:]
+
+def re_mocomp(cphd, antenna_location, k_r, center):
+##############################################################################
+#                                                                            #
+#  This is the re-motion compensation algorithm.  It re-motion compensates   #
+#  the phase history to a new scene center.  The "center" argument is the    #
+#  3D vector (in meters) that points to the new scene center using the old   #
+#  scene center as the origin.                                               #
+#                                                                            #
+##############################################################################
+
+    R0 = np.array([norm(antenna_location.T, axis = -1)]).T
+    RC = np.array([norm(antenna_location.T-center, axis = -1)]).T
+    dr = R0-RC
+    remocomp = np.exp(-1j*k_r*dr)
+    
+    return cphd*remocomp
