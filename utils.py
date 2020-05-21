@@ -45,27 +45,26 @@ def historgram_equalization(img):
     
 def pauli_decomposition(S_hh, S_vv, S_hv):
        
-    red = np.abs(S_hh - S_vv)
-    green = np.abs(S_hv) 
-    blue = np.abs(S_hh + S_vv) 
-
-    red = np.log10(red / np.max(red))
-    green = np.log10(green / np.max(green))
-    blue = np.log10(blue / np.max(blue))
+    out = np.zeros((S_hh.shape + (3, )), np.uint8)
+    Kp = [S_hh - S_vv, 2 * S_hv, S_hh + S_vv]
+    for i, k in enumerate(Kp):
+        k = np.log10(np.abs(k) / np.abs(k).max())
+        k = k - k.min()
+        out[...,i] = np.uint8(k / k.max() * 255.0)
     
-    red = red - red.min()
-    green = green - green.min()
-    blue = blue - blue.min()
+    return out
+
+def krogager_decomposition(S_hh, S_vv, S_hv):
     
-    red = red / np.max(red) * 255.0
-    green = green / np.max(green) * 255.0
-    blue = blue / np.max(blue) * 255.0
-
-    return np.vstack((red[np.newaxis],green[np.newaxis],
-                      blue[np.newaxis])).transpose(1,2,0).astype('uint8')
-
-def krogager_decomposition(S_hh, S_vv, S_hv, dynamic_range = 30):
-    pass
+    out = np.zeros((S_hh.shape + (3, )), np.uint8)
+    Kc = [1j*S_hv - 0.5*(S_hh - S_vv), 0.5*(S_hh + S_vv),
+          1j*S_hv + 0.5*(S_hh - S_vv)]
+    for i, k in enumerate(Kc):
+        k = np.log10(np.abs(k) / np.abs(k).max())
+        k = k - k.min()
+        out[...,i] = np.uint8(k / k.max() * 255.0)
+    
+    return out
 
 # Display log-scaled image
 def imshow(im, dynamic_range=70, ax=plt):
