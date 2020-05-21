@@ -6,8 +6,6 @@ Author: Ronald Kemker
 '''
 from scipy.io import loadmat
 import numpy as np
-import warnings
-from signal_processing import hamming_window
 
 class CVData(object):
     """Processes the Civilian Vechicle SAR Datadome Data
@@ -26,10 +24,8 @@ class CVData(object):
         max_frequency: Numeric > 0. Maximum frequency (in Hz)
         bandwidth: Numeric > 0.  Bandwidth to process (in Hz)
         center_freq: Numeric > 0.  Center frequency to process (in Hz)
-        taper_func: func. Side-lobe reduction func from singal_processing.py
         single_precision: Boolean.  If false, it will be double precision.
-        altitude: numeric >= 0.0.  The altitude of the simulated collection.
-                  Can be an array if the altitude is not constant.
+
     
     # References
         - [Civilian Vehicle Data Dome Overview](
@@ -39,9 +35,7 @@ class CVData(object):
                  min_azimuth_angle = 0, max_azimuth_angle=360, 
                  min_frequency = 0, max_frequency=20e9,
                  bandwidth=None, center_frequency=None,
-                 taper_func = hamming_window, 
-                 verbose = True, n_jobs=1, single_precision=True,
-                 altitude=0):
+                 verbose = True, single_precision=True):
         
         self.target = target
         pol = polarization
@@ -79,13 +73,8 @@ class CVData(object):
         freq_idx = np.logical_and(freq >= minfreq, freq <= maxfreq)
         
         # Complex phase history data
-        self.cphd = cdtype(data[pol][0,0])[freq_idx][:, az_idx]
+        self.cphd = cdtype(data[pol][0,0].T)[:, freq_idx][az_idx]
         
-        if np.isscalar(altitude):
-            self.altitude = altitude * np.ones(az_idx.shape[0], fdtype)
-        else:
-            self.altitude = altitude
-
         # Grab the true collection geometries stored in the data
         AntAzim = fdtype(azim[az_idx])
         AntElev = fdtype(data['elev'][0,0][0,0])
@@ -94,11 +83,7 @@ class CVData(object):
         minF = np.min(AntFreq)
         deltaF = AntFreq[1] - AntFreq[0] # Pulse-Bandwidth
         [K, Np] = self.cphd.shape 
-        
-        # Apply a 2-D hamming window to CPHD for side-lobe suppression
-        if taper_func is not None:
-            self.cphd = cdtype(taper_func(self.cphd))
-                
+                        
         # Determine the azimuth angles of the image pulses (radians)
         AntAz = AntAzim*np.pi/180.0
         AntElev = AntElev*np.pi/180.0
@@ -118,12 +103,6 @@ class CVData(object):
         # Determine the resolution of the image (m)
         dr = c/(2*deltaF*K)
         dx = maxLambda/(2*totalAz)
-        with warnings.catch_warnings():
-            warnings.filterwarnings('error')
-            try:
-                dwell_angle = np.arccos(c / (4 * dx * center_freq))
-            except RuntimeWarning:
-                dwell_angle = 0.0
 
         # Print off some data statictics (if verbose is on)
         f1 = np.min(AntFreq)/1e9
@@ -143,7 +122,6 @@ class CVData(object):
             print('Max Scene Size (x-range): %1.2fm' % maxWx)
             print('        Range Resolution: %1.2fm'  % dr)
             print('  Cross-Range Resolution: %1.2fm'  % dx)
-            print('             Dwell Angle: %1.1f degrees' % dwell_angle)
             print("")
         
         self.num_pulses = Np
@@ -158,7 +136,6 @@ class CVData(object):
         self.range_pixels = int(self.range_extent / dr)
         self.cross_range_pixels = int(self.cross_range_extent / dx )
         self.polarization = pol
-
-    # Return Complex Phase History Data
-    def getCPHD(self):
-        return self.cphd
+        self.f_0 = (AntFreq[0] + AntFreq[-1])/2
+        self.k_r = 4*np.pi*AntFreq/c
+        self.n_hat = np.array([ 0, 0 , 1]  , dtype=fdtype)
