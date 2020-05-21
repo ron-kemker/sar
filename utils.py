@@ -42,7 +42,6 @@ def historgram_equalization(img):
     cdf = np.ma.filled(cdf_m,0).astype('uint8')
     return cdf[img]
     
-    
 def pauli_decomposition(S_hh, S_vv, S_hv):
        
     out = np.zeros((S_hh.shape + (3, )), np.uint8)
