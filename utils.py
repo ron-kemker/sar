@@ -26,6 +26,47 @@ def ift(x, ax = -1):
 def ift2(x):
     return fftshift(ifft2(fftshift(x)))
 
+def histogram_equalization_rgb(img):
+    
+    for i in range(3):
+        img[...,i] = historgram_equalization(img[...,i])
+        
+    return img
+
+def historgram_equalization(img):
+    
+    hist,bins = np.histogram(img.flatten(),256,[0,256])
+    cdf = hist.cumsum()
+    cdf_m = np.ma.masked_equal(cdf,0)
+    cdf_m = (cdf_m - cdf_m.min())*255/(cdf_m.max()-cdf_m.min())
+    cdf = np.ma.filled(cdf_m,0).astype('uint8')
+    return cdf[img]
+    
+    
+def pauli_decomposition(S_hh, S_vv, S_hv):
+       
+    red = np.abs(S_hh - S_vv)
+    green = np.abs(S_hv) 
+    blue = np.abs(S_hh + S_vv) 
+
+    red = np.log10(red / np.max(red))
+    green = np.log10(green / np.max(green))
+    blue = np.log10(blue / np.max(blue))
+    
+    red = red - red.min()
+    green = green - green.min()
+    blue = blue - blue.min()
+    
+    red = red / np.max(red) * 255.0
+    green = green / np.max(green) * 255.0
+    blue = blue / np.max(blue) * 255.0
+
+    return np.vstack((red[np.newaxis],green[np.newaxis],
+                      blue[np.newaxis])).transpose(1,2,0).astype('uint8')
+
+def krogager_decomposition(S_hh, S_vv, S_hv, dynamic_range = 30):
+    pass
+
 # Display log-scaled image
 def imshow(im, dynamic_range=70, ax=plt):
         
