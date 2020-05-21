@@ -14,7 +14,6 @@ from signal_processing import residual_video_phase_compensation as RVP_Comp
 from signal_processing import spatial_variant_apodization as SVA
 from autofocus import phase_gradient_autofocus as PGA
 from utils import pauli_decomposition as PD
-from utils import histogram_equalization_rgb as histEq
 
 if __name__ == '__main__':
 
@@ -52,8 +51,7 @@ if __name__ == '__main__':
         image_arr += [image]
 
     pauli_rgb = PD(image_arr[0],image_arr[1],image_arr[2])
-    # pauli_rgb = histEq(pauli_rgb)
     
     ax[1][1].imshow(pauli_rgb)    
     ax[1][1].axis('off')
-    ax[1][1].title.set_text('Dual-Pol False Color')
+    ax[1][1].title.set_text('False Color')
