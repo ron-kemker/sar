@@ -6,12 +6,15 @@ Author: Ronald Kemker
 
 '''
 
-import numpy as np
 from fileIO.gotcha import GOTCHA
 from image_formation import polar_format_algorithm as PFA
 from utils import imshow
 import matplotlib.pyplot as plt
 from signal_processing import residual_video_phase_compensation as RVP_Comp
+from signal_processing import spatial_variant_apodization as SVA
+from autofocus import phase_gradient_autofocus as PGA
+from utils import pauli_decomposition as PD
+from utils import histogram_equalization_rgb as histEq
 
 if __name__ == '__main__':
 
@@ -20,7 +23,7 @@ if __name__ == '__main__':
     plt.close('all')
         
     fig, ax = plt.subplots(2,2 , figsize=[8,8])
-    polarization = ['VV','HH','VH']
+    polarization = ['HH','VV','HV']
     image_arr = []
     for i, pol in enumerate(polarization):
         
@@ -39,24 +42,18 @@ if __name__ == '__main__':
                 n_jobs=8,
                 taylor_weighting = 30,
                 )
+        
+        # image = SVA(image, N=1)
+        # image, _ = PGA(image)
+        
         imshow(image, dynamic_range, ax=ax[int(i//2)][int(i%2)])
         ax[int(i//2)][int(i%2)].axis('off')
         ax[int(i//2)][int(i%2)].title.set_text(pol)
         image_arr += [image]
 
-    rgb_img = np.zeros(image_arr[0].shape+(3, ), dtype=np.complex64 )
-    sh = rgb_img.shape
-    rgb_img[...,0] = image_arr[0]
-    rgb_img[...,1] = image_arr[1]
-    rgb_img[...,2] = image_arr[2]
+    pauli_rgb = PD(image_arr[0],image_arr[1],image_arr[2])
+    # pauli_rgb = histEq(pauli_rgb)
     
-    rgb_img = np.abs(rgb_img)
-    rgb_img = rgb_img.reshape(-1, 3)
-    rgb_img = rgb_img / rgb_img.max(0)
-    rgb_img = 10.0 * np.log10(rgb_img)
-    X_std = (rgb_img - rgb_img.min(axis=0)) / \
-        (rgb_img.max(axis=0) - rgb_img.min(axis=0))
-    X_scaled = np.uint8(X_std * 255).reshape(sh)
-    ax[1][1].imshow(X_scaled)    
+    ax[1][1].imshow(pauli_rgb)    
     ax[1][1].axis('off')
     ax[1][1].title.set_text('Dual-Pol False Color')
