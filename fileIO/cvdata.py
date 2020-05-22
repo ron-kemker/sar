@@ -142,7 +142,7 @@ class CVData(object):
         self.num_pulses = Np
         self.num_samples = K
         self.elevation = AntElev*np.ones((Np, ), fdtype)
-        self.azimuth = AntAzim*np.pi/180.0
+        self.azimuth = AntAz
         self.freq = AntFreq
         self.bandwidth = (f1-f2)*1e9
         self.delta_r = fdtype(c/(2.0*self.bandwidth))
