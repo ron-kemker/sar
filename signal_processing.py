@@ -193,10 +193,10 @@ def polyphase_interp (x, xp, yp, left=None, right=None,n_taps=15,
         
     # Compute input and output sample spacing
     dxp = np.diff(xp).min()
-    dx = np.diff(x).min()
+    dx = np.abs(np.diff(x).min())
     
     # Assume uniformly spaced input
-    if dx > (1.001*np.diff(x)).max() or dx < (0.999*np.diff(x)).min():
+    if np.abs(np.diff(np.diff(x)).max()) > 1e-3:
             raise ValueError('Output sample spacing not uniform')
     
     # Input centered convolution - scale output sample spacing to 1
