@@ -216,8 +216,8 @@ def polar_format_algorithm(sar_obj, single_precision=True,
 
     # Define the shape of the output image
     if output_shape is not None:
-        nu = image_shape[0]
-        nv = image_shape[1]
+        nu = output_shape[0]
+        nv = output_shape[1]
     elif upsample:
         nu = 2**int(np.log2(K)+bool(np.mod(np.log2(K),1)))
         nv = 2**int(np.log2(Np)+bool(np.mod(np.log2(Np),1)))
