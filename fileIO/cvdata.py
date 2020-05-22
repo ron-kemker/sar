@@ -15,18 +15,31 @@ class CVData(object):
     See examples/cv_example.py for example code.
 
     # Arguments
-        data_path: String. File path to desired data file (.mat)
-        target: String. What vehicle is present in the data
-        polarization: String.  What polarization to image (HH,HV,VV)
-        min_azimuth_angle: Numeric >= 0. Minimum azimuth angle (degrees)
-        max_azimuth_angle: Numeric > 0. Maximum azimuth angle (degrees)
-        min_frequency: Numeric >= 0. Minimum frequency (in Hz)
-        max_frequency: Numeric > 0. Maximum frequency (in Hz)
-        bandwidth: Numeric > 0.  Bandwidth to process (in Hz)
-        center_freq: Numeric > 0.  Center frequency to process (in Hz)
-        single_precision: Boolean.  If false, it will be double precision.
+        data_path         : String. 
+                            File path to desired data file (.mat)
+        target            : String. 
+                            What vehicle is present in the data
+        polarization      : String.  
+                            What polarization to image (HH,HV,VV)
+        min_azimuth_angle : Numeric >= 0. 
+                            Minimum azimuth angle (degrees)
+        max_azimuth_angle : Numeric > 0. 
+                            Maximum azimuth angle (degrees)
+        min_frequency     : Numeric >= 0. 
+                            Minimum frequency (in Hz)
+        max_frequency     : Numeric > 0. 
+                            Maximum frequency (in Hz)
+        bandwidth         : Numeric > 0.  
+                            Bandwidth to process (in Hz)
+        center_freq       : Numeric > 0.  
+                            Center frequency to process (in Hz)
+        single_precision  : Boolean.  
+                            If false, it will be double precision.
+        verbose           : Boolean
+                            If true, prints off statistics for the data
+        altitude          : Numeric. 
+                            FLight altitude (meters)
 
-    
     # References
         - [Civilian Vehicle Data Dome Overview](
           https://www.sdms.afrl.af.mil/index.php?collection=cv_dome)
@@ -35,7 +48,8 @@ class CVData(object):
                  min_azimuth_angle = 0, max_azimuth_angle=360, 
                  min_frequency = 0, max_frequency=20e9,
                  bandwidth=None, center_frequency=None,
-                 verbose = True, single_precision=True):
+                 verbose = True, single_precision=True,
+                 altitude=10):
         
         self.target = target
         pol = polarization
@@ -43,6 +57,7 @@ class CVData(object):
         maxaz = max_azimuth_angle
         minfreq = min_frequency
         maxfreq = max_frequency
+        Z_a = altitude
         
         if single_precision:
             fdtype = np.float32
@@ -82,7 +97,7 @@ class CVData(object):
         center_freq = (AntFreq[-1] + AntFreq[0])/2.0
         minF = np.min(AntFreq)
         deltaF = AntFreq[1] - AntFreq[0] # Pulse-Bandwidth
-        [K, Np] = self.cphd.shape 
+        [Np, K] = self.cphd.shape 
                         
         # Determine the azimuth angles of the image pulses (radians)
         AntAz = AntAzim*np.pi/180.0
@@ -126,7 +141,7 @@ class CVData(object):
         
         self.num_pulses = Np
         self.num_samples = K
-        self.elevation = AntElev*np.pi/180.0*np.ones((Np, ), fdtype)
+        self.elevation = AntElev*np.ones((Np, ), fdtype)
         self.azimuth = AntAzim*np.pi/180.0
         self.freq = AntFreq
         self.bandwidth = (f1-f2)*1e9
@@ -139,3 +154,10 @@ class CVData(object):
         self.f_0 = (AntFreq[0] + AntFreq[-1])/2
         self.k_r = 4*np.pi*AntFreq/c
         self.n_hat = np.array([ 0, 0 , 1]  , dtype=fdtype)
+        
+        Z_a = np.ones(self.elevation.shape) * Z_a
+        X_a = Z_a / np.tan(self.elevation) * np.sin(self.azimuth)
+        Y_a = Z_a / np.tan(self.elevation) * np.cos(self.azimuth)
+        
+        self.antenna_location = np.vstack((X_a[np.newaxis],Y_a[np.newaxis],
+                                           Z_a[np.newaxis]))
