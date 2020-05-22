@@ -16,7 +16,7 @@ from autofocus import phase_gradient_autofocus as PGA
 from signal_processing import residual_video_phase_compensation as RVP_Comp
 
 if __name__ == '__main__':
-    data_path = '..\..\data\Civilian Vehicles\Domes\Camry\Camry_el30.0000.mat'
+    data_path = '..\..\data\Civilian Vehicles\Domes\Camry\Camry_el40.0000.mat'
     target = data_path.split('\\')[-2]
     plt.close('all')
     
@@ -24,18 +24,18 @@ if __name__ == '__main__':
         
     with timer as _:
         sar_obj = CVData(data_path, target,  
-                polarization='vv',
+                polarization='hv',
                 center_frequency=9.6e9, 
-                bandwidth=800e6,
+                bandwidth=640e6,
                 min_azimuth_angle = 40,
-                max_azimuth_angle = 45,
-                altitude = 15, # Meters
+                max_azimuth_angle = 44,
+                altitude = 7100, # Meters
                 )
 
     fig, ax = plt.subplots(1,3, figsize=[8,8])
     plt.tight_layout()
     
-    sar_obj.cphd = RVP_Comp(sar_obj.cphd, sar_obj.freq)
+    # sar_obj.cphd = RVP_Comp(sar_obj.cphd, sar_obj.freq)
     
     timer = Timer('Polar Format Algorithm')
     with timer as _:
@@ -44,7 +44,6 @@ if __name__ == '__main__':
                 n_jobs=8,
                 taylor_weighting=30,
                 )
-    
         imshow(image, ax=ax[0], dynamic_range=30)
         ax[0].axis('off')
         ax[0].title.set_text('Polar Format Algorithm')
