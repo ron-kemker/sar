@@ -160,7 +160,8 @@ def back_projection(sar_obj, fft_samples=None, n_jobs=1,
 
 def polar_format_algorithm(sar_obj, single_precision=True,
                             interp_func = poly_int, upsample=True,
-                            taylor_weighting=0, n_jobs=1):
+                            taylor_weighting=0, n_jobs=1,
+                            output_shape=None):
     """Performs polar format algorithm for image-formation
     
     @author: Ronald Kemker
@@ -172,15 +173,18 @@ def polar_format_algorithm(sar_obj, single_precision=True,
                           One of the fileIO SAR data readers.
         single_precision: Boolean.  Default=True  
                           If false, it will be double precision.
-             interp_func: Function.  Default=polyphase_interpolation
+             interp_func: Function. Default=polyphase_interpolation from 
+                          signal_processing.py
                           The type of interpolation used for polar formatting
-                upsample: Boolean. 
+                upsample: Boolean.   Default=True.
                           Upsample to the nearest power of 2.
         taylor_weighting: Numeric.  Default=0 (No Taylor Weighting)
                           Taylor weighting factor (in dB) for sidelobe 
                           mitigation 
                   n_cpus: Integer.  Default=1 
                           Number of CPUs used for interpolation operations
+            output_shape: List with two integers.  Default=None.
+                          Define the shape of the output image.
     # References
         - Carrera, Goodman, and Majewski (1995).
     """    
@@ -204,14 +208,17 @@ def polar_format_algorithm(sar_obj, single_precision=True,
         fdtype = np.float64
         cdtype = np.complex128
 
-    # Find the center pulse
+    # Find the center pulse    
     if np.mod(Np,2)>0:
         R_c = pos[int(Np/2)]
     else:
         R_c = np.mean(pos[int(Np/2-1):int(Np/2+1)], axis = 0)
 
     # Define the shape of the output image
-    if upsample:
+    if output_shape is not None:
+        nu = image_shape[0]
+        nv = image_shape[1]
+    elif upsample:
         nu = 2**int(np.log2(K)+bool(np.mod(np.log2(K),1)))
         nv = 2**int(np.log2(Np)+bool(np.mod(np.log2(Np),1)))
     else:
