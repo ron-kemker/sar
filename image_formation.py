@@ -185,6 +185,12 @@ def polar_format_algorithm(sar_obj, single_precision=True,
                           Number of CPUs used for interpolation operations
             output_shape: List with two integers.  Default=None.
                           Define the shape of the output image.
+    # Outputs
+                  image:  2-D numpy array, complex-valued
+                          This is the PFA formed image
+                    IDP:  Tuple of 1-D numpy arrays (float)
+                          This is the projected X,Y coordinates
+    
     # References
         - Carrera, Goodman, and Majewski (1995).
     """    
@@ -195,8 +201,8 @@ def polar_format_algorithm(sar_obj, single_precision=True,
     Np          =   sar_obj.num_pulses
     f_0         =   sar_obj.f_0
     pos         =   sar_obj.antenna_location.T
-    k           =   sar_obj.k_r
-    n_hat       =   sar_obj.n_hat
+    k_r         =   sar_obj.k_r
+    n_hat       =   sar_obj.n_hat # TODO: Consider converting to 2-D array
     cphd        =   sar_obj.cphd
     delta_r     =   sar_obj.delta_r
     
@@ -245,7 +251,7 @@ def polar_format_algorithm(sar_obj, single_precision=True,
     r_hat = (pos.T/norm(pos,axis=1)).T
         
     #Compute kx and ky meshgrid
-    k_matrix = np.tile(k,(Np,1))
+    k_matrix = np.tile(k_r,(Np,1))
     ku = np.matmul(r_hat,u_hat.T)[:,np.newaxis] * k_matrix
     kv = np.matmul(r_hat,v_hat.T)[:,np.newaxis] * k_matrix
     
@@ -314,4 +320,4 @@ def polar_format_algorithm(sar_obj, single_precision=True,
             polar_interp.imag[:,i] = interp_func(k_vi, ky_new[:,i], 
                 rad_interp.imag[:,i]*win2, left=0, right=0)
 
-    return ft2(np.nan_to_num(polar_interp))  
+    return ft2(np.nan_to_num(polar_interp)), (k_ui, k_vi)
