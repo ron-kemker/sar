@@ -15,25 +15,25 @@ from numpy.linalg import norm
 
 # This applies a Hamming window to the CPHD file (side-lobe suppression)
 def hamming_window(cphd):
-    [K, Np] = cphd.shape
-    hamming1 = np.hamming(K)[np.newaxis].T
-    hamming2 = np.hamming(Np)[np.newaxis]
+    sh = cphd.shape
+    hamming1 = np.hamming(sh[0])[np.newaxis].T
+    hamming2 = np.hamming(sh[1])[np.newaxis]
     taper_window = np.matmul(hamming1, hamming2)
     return cphd * taper_window
 
 # This applies a Hamming window to the CPHD file (side-lobe suppression)
 def hanning_window(cphd):
-    [K, Np] = cphd.shape
-    hamming1 = np.hanning(K)[np.newaxis].T
-    hamming2 = np.hanning(Np)[np.newaxis]
+    sh = cphd.shape
+    hamming1 = np.hanning(sh[0])[np.newaxis].T
+    hamming2 = np.hanning(sh[1])[np.newaxis]
     taper_window = np.matmul(hamming1, hamming2)
     return cphd * 2.0 * taper_window
 
 # This applies a Taylor window to the CPHD file (side-lobe suppression)
-def taylor_window(cphd , sidelobe=30, n_bar=4):
-    [K, Np] = cphd.shape
-    taylor1 = taylor(K, sidelobe, n_bar)[np.newaxis].T
-    taylor2 = taylor(Np, sidelobe)[np.newaxis]
+def taylor_window(cphd , sidelobe=30):
+    sh = cphd.shape
+    taylor1 = taylor(sh[0], sidelobe)[np.newaxis].T
+    taylor2 = taylor(sh[1], sidelobe)[np.newaxis]
     taper_window = np.matmul(taylor1, taylor2)   
     return cphd * taper_window
 
