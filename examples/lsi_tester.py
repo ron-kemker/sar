@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Jun  1 12:42:04 2020
+'''
+File: lsi_tester.py
+Description: Example script to test lsi.py
+Author: Ronald Kemker
 
-@author: Master
-"""
+'''
 
 import numpy as np
 from fileIO.lsi import LSIReader, LSIWriter
@@ -45,3 +46,6 @@ LSIWriter('test_lsi.lsi', pixels_per_column, pixels_per_row,channels,
           text_header, data)
 
 data_read, meta_read = LSIReader('test_lsi.lsi')
+
+print ('Data Correct?', np.all(data_read==data))
+
